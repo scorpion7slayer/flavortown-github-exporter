@@ -1,0 +1,22 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+.grepai/
+CLAUDE.md
+
+# Node
+node_modules/
+
+# Build artifacts
+dist/
+build/
+*.zip

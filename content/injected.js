@@ -53,9 +53,8 @@ class GitHubImportModal extends HTMLElement {
             const handler = (event) => {
                 if (event.data.type === 'GITHUB_DATA_RESULT') {
                     window.removeEventListener('message', handler);
-                    if (event.data.username) {
-                        this.state.username = event.data.username;
-                        this.state.token = event.data.token || '';
+                    if (event.data.token) {
+                        this.state.token = event.data.token;
                         this.state.view = 'list';
                         this.fetchRepositories().then(resolve);
                     } else {
@@ -477,15 +476,15 @@ class GitHubImportModal extends HTMLElement {
             }
 
             if (target.closest('.save-username-btn')) {
-                const usernameInput = this.shadowRoot.querySelector('#gh-username-input');
                 const tokenInput = this.shadowRoot.querySelector('#gh-token-input');
-                const username = usernameInput.value.trim();
                 const token = tokenInput ? tokenInput.value.trim() : '';
-                if (username) {
-                    this.state.username = username;
+                if (token) {
                     this.state.token = token;
-                    this.saveData(username, token);
+                    this.saveData('', token);
                     await this.fetchRepositories();
+                } else {
+                    this.state.error = 'Please enter your GitHub token';
+                    this.render();
                 }
             }
 
@@ -637,32 +636,25 @@ class GitHubImportModal extends HTMLElement {
     }
 
     renderSetup() {
+        const createTokenUrl = 'https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=public_repo';
         return `
             <div class="setup-view">
                 <div class="form-group">
-                    <label for="gh-username-input">GitHub Username</label>
-                    <input
-                        type="text"
-                        id="gh-username-input"
-                        placeholder="e.g. octocat"
-                        value="${this.state.username}"
-                        autocomplete="off"
-                        autofocus
-                    >
-                </div>
-                <div class="form-group">
-                    <label for="gh-token-input">GitHub Token <span style="color: var(--color-fg-muted); font-weight: normal;">(optional)</span></label>
+                    <label for="gh-token-input">GitHub Token</label>
                     <input
                         type="password"
                         id="gh-token-input"
                         placeholder="ghp_xxxxxxxxxxxx"
                         value="${this.state.token}"
                         autocomplete="off"
+                        autofocus
                     >
-                    <p class="helper-text">Personal access token for higher rate limits. Create one at GitHub Settings → Developer settings → Personal access tokens.</p>
+                    <p class="helper-text">
+                        <a href="${createTokenUrl}" target="_blank" style="color: var(--color-accent-fg);">Create a token</a> — click "Generate token" at the bottom of the page.
+                    </p>
                 </div>
                 ${this.state.error ? `<p class="error-text">${this.state.error}</p>` : ''}
-                <button class="btn btn-primary save-username-btn" style="width: 100%; margin-top: 8px;">Load Repositories</button>
+                <button class="btn btn-primary save-username-btn" style="width: 100%; margin-top: 12px;">Load Repositories</button>
             </div>
         `;
     }

@@ -3,6 +3,18 @@
  * This script runs in the page's main context to properly define custom elements
  */
 
+const FLAVORTOWN_PROJECT_ID = '7195';
+
+function trackExtensionUsage() {
+    fetch('https://flavortown.hackclub.com/explore/extensions', {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+            [`X-Flavortown-Ext-${FLAVORTOWN_PROJECT_ID}`]: 'true'
+        }
+    }).catch(() => {});
+}
+
 const LANGUAGE_COLORS = {
     JavaScript: '#f1e05a',
     TypeScript: '#3178c6',
@@ -544,6 +556,8 @@ class GitHubImportModal extends HTMLElement {
         }
 
         this.showNotification('Project imported! Please fill in the description manually.', 'success');
+
+        trackExtensionUsage();
     }
 
     showNotification(message, type) {
@@ -778,3 +792,5 @@ if (document.readyState === 'loading') {
 
 setTimeout(injectImportButton, 500);
 setTimeout(injectImportButton, 1500);
+
+trackExtensionUsage();

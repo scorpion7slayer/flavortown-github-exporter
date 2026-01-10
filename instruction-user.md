@@ -1,12 +1,13 @@
 # Flavortown GitHub Exporter
 
-A browser extension (Chrome & Firefox) to export your GitHub projects to [Flavortown](https://flavortown.hackclub.com) with one click.
+A browser extension (Chrome & Firefox) to import your GitHub projects to [Flavortown](https://flavortown.hackclub.com) with one click.
 
 ## Features
 
-- Search GitHub users and browse their public repositories
-- Auto-fill the Flavortown project form with repository data
-- GitHub-native dark theme design
+- **Integrated button** next to "Create a new Project" title
+- **Modal interface** to select your GitHub repositories
+- **Auto-fill** project title, demo link, repository URL, and README link
+- **Remembers your username** for future imports
 - Works on both Chrome and Firefox
 
 ## Installation
@@ -27,33 +28,30 @@ A browser extension (Chrome & Firefox) to export your GitHub projects to [Flavor
 ## Usage
 
 1. Navigate to [Flavortown New Project](https://flavortown.hackclub.com/projects/new)
-2. Click the extension icon in your browser toolbar
-3. Enter a GitHub username and click "Search"
-4. Select the repository you want to export
-5. Click "Export to Flavortown"
+2. Click the green **"Import from GitHub"** button next to the page title
+3. Enter your GitHub username (saved for next time)
+4. Select the repository you want to import
+5. Click **"Import Project"**
 
 The form will be automatically filled with:
 - **Project Title**: Repository name
-- **Description**: Repository description
-- **Demo Link**: Repository homepage (or GitHub URL)
+- **Demo Link**: Repository homepage (or GitHub URL if no homepage)
 - **Repository URL**: GitHub repository link
 - **Raw README URL**: Direct link to README.md
 
-## Development
+**Note**: The description field is left empty for you to fill manually with your own project description.
+
+## Project Structure
 
 ```
 flavortown-github-export-extension/
 ├── manifest.json           # Extension manifest (v3)
-├── popup/
-│   ├── popup.html         # Extension popup UI
-│   ├── popup.css          # Styles (GitHub theme)
-│   └── popup.js           # Popup logic
 ├── content/
-│   ├── content.js         # Form auto-fill script
-│   └── content.css        # Notification styles
-├── background/
-│   └── service-worker.js  # Background service worker
-└── icons/                 # Extension icons
+│   └── content.js         # Injected button + modal UI
+├── icons/
+│   ├── GitHub_dark.svg    # White GitHub logo
+│   └── GitHub_light.svg   # Dark GitHub logo
+└── instruction-user.md    # This file
 ```
 
 ## License

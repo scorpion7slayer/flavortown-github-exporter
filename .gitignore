@@ -20,3 +20,7 @@ node_modules/
 dist/
 build/
 *.zip
+
+# Browser extension files
+flavortown-github-export-extension.crx
+flavortown-github-export-extension.pem

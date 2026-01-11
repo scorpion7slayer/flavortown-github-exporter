@@ -3,54 +3,54 @@
  * This script runs in the page's main context to properly define custom elements
  */
 
-const FLAVORTOWN_PROJECT_ID = '7195';
+const FLAVORTOWN_PROJECT_ID = "7195";
 
 function trackExtensionUsage() {
-    fetch('https://flavortown.hackclub.com/explore/extensions', {
-        method: 'GET',
-        credentials: 'same-origin',
+    fetch("https://flavortown.hackclub.com/explore/extensions", {
+        method: "GET",
+        credentials: "same-origin",
         headers: {
-            [`X-Flavortown-Ext-${FLAVORTOWN_PROJECT_ID}`]: 'true'
-        }
+            [`X-Flavortown-Ext-${FLAVORTOWN_PROJECT_ID}`]: "true",
+        },
     }).catch(() => {});
 }
 
 const LANGUAGE_COLORS = {
-    JavaScript: '#f1e05a',
-    TypeScript: '#3178c6',
-    Python: '#3572A5',
-    Java: '#b07219',
-    'C++': '#f34b7d',
-    C: '#555555',
-    'C#': '#178600',
-    Go: '#00ADD8',
-    Rust: '#dea584',
-    Ruby: '#701516',
-    PHP: '#4F5D95',
-    Swift: '#F05138',
-    Kotlin: '#A97BFF',
-    Dart: '#00B4AB',
-    HTML: '#e34c26',
-    CSS: '#563d7c',
-    Shell: '#89e051',
-    Vue: '#41b883',
-    Svelte: '#ff3e00',
-    Lua: '#000080',
-    default: '#8b949e'
+    JavaScript: "#f1e05a",
+    TypeScript: "#3178c6",
+    Python: "#3572A5",
+    Java: "#b07219",
+    "C++": "#f34b7d",
+    C: "#555555",
+    "C#": "#178600",
+    Go: "#00ADD8",
+    Rust: "#dea584",
+    Ruby: "#701516",
+    PHP: "#4F5D95",
+    Swift: "#F05138",
+    Kotlin: "#A97BFF",
+    Dart: "#00B4AB",
+    HTML: "#e34c26",
+    CSS: "#563d7c",
+    Shell: "#89e051",
+    Vue: "#41b883",
+    Svelte: "#ff3e00",
+    Lua: "#000080",
+    default: "#8b949e",
 };
 
 class GitHubImportModal extends HTMLElement {
     constructor() {
         super();
-        this.attachShadow({ mode: 'open' });
+        this.attachShadow({ mode: "open" });
         this.state = {
-            view: 'setup',
-            username: '',
-            token: '',
+            view: "setup",
+            username: "",
+            token: "",
             repositories: [],
             selectedRepo: null,
             isLoading: false,
-            error: null
+            error: null,
         };
     }
 
@@ -63,30 +63,30 @@ class GitHubImportModal extends HTMLElement {
     async loadSavedData() {
         return new Promise((resolve) => {
             const handler = (event) => {
-                if (event.data.type === 'GITHUB_DATA_RESULT') {
-                    window.removeEventListener('message', handler);
+                if (event.data.type === "GITHUB_DATA_RESULT") {
+                    window.removeEventListener("message", handler);
                     if (event.data.token) {
                         this.state.token = event.data.token;
-                        this.state.view = 'list';
+                        this.state.view = "list";
                         this.fetchRepositories().then(resolve);
                     } else {
                         resolve();
                     }
                 }
             };
-            window.addEventListener('message', handler);
-            window.postMessage({ type: 'GET_GITHUB_DATA' }, '*');
+            window.addEventListener("message", handler);
+            window.postMessage({ type: "GET_GITHUB_DATA" }, "*");
             setTimeout(resolve, 1000);
         });
     }
 
     saveData(username, token) {
-        window.postMessage({ type: 'SAVE_GITHUB_DATA', username, token }, '*');
+        window.postMessage({ type: "SAVE_GITHUB_DATA", username, token }, "*");
     }
 
     async fetchRepositories() {
         if (!this.state.token) {
-            this.state.error = 'GitHub token is required';
+            this.state.error = "GitHub token is required";
             this.render();
             return;
         }
@@ -97,17 +97,22 @@ class GitHubImportModal extends HTMLElement {
 
         try {
             const headers = {
-                'Authorization': `token ${this.state.token}`
+                Authorization: `token ${this.state.token}`,
             };
 
             // If no username provided, get it from the token
             if (!this.state.username) {
-                const userResponse = await fetch('https://api.github.com/user', { headers });
+                const userResponse = await fetch(
+                    "https://api.github.com/user",
+                    { headers },
+                );
                 if (userResponse.status === 401) {
-                    throw new Error('Invalid token. Please check your GitHub token.');
+                    throw new Error(
+                        "Invalid token. Please check your GitHub token.",
+                    );
                 }
                 if (!userResponse.ok) {
-                    throw new Error('Failed to authenticate with GitHub');
+                    throw new Error("Failed to authenticate with GitHub");
                 }
                 const userData = await userResponse.json();
                 this.state.username = userData.login;
@@ -115,41 +120,45 @@ class GitHubImportModal extends HTMLElement {
 
             const response = await fetch(
                 `https://api.github.com/users/${this.state.username}/repos?per_page=100&sort=updated&type=owner`,
-                { headers }
+                { headers },
             );
 
             if (response.status === 404) {
-                throw new Error('User not found');
+                throw new Error("User not found");
             }
             if (response.status === 401) {
-                throw new Error('Invalid token. Please check your GitHub token.');
+                throw new Error(
+                    "Invalid token. Please check your GitHub token.",
+                );
             }
             if (!response.ok) {
-                throw new Error('Failed to fetch repositories');
+                throw new Error("Failed to fetch repositories");
             }
 
             const data = await response.json();
             this.state.repositories = data
-                .filter(repo => !repo.fork)
-                .map(repo => ({
+                .filter((repo) => !repo.fork)
+                .map((repo) => ({
                     id: repo.id,
                     name: repo.name,
                     full_name: repo.full_name,
                     description: repo.description,
                     html_url: repo.html_url,
                     homepage: repo.homepage,
-                    default_branch: repo.default_branch || 'main',
+                    default_branch: repo.default_branch || "main",
                     stars: repo.stargazers_count,
                     language: repo.language,
-                    langColor: LANGUAGE_COLORS[repo.language] || LANGUAGE_COLORS.default
+                    langColor:
+                        LANGUAGE_COLORS[repo.language] ||
+                        LANGUAGE_COLORS.default,
                 }));
 
             this.state.isLoading = false;
-            this.state.view = 'list';
+            this.state.view = "list";
         } catch (error) {
             this.state.isLoading = false;
             this.state.error = error.message;
-            this.state.view = 'setup';
+            this.state.view = "setup";
         }
 
         this.render();
@@ -328,7 +337,7 @@ class GitHubImportModal extends HTMLElement {
 
             .change-link {
                 color: var(--color-accent-fg);
-                font-size: 12px;
+                font-size: 12px; 
                 cursor: pointer;
                 background: none;
                 border: none;
@@ -480,98 +489,116 @@ class GitHubImportModal extends HTMLElement {
     }
 
     addEventListeners() {
-        this.shadowRoot.addEventListener('click', async (e) => {
+        this.shadowRoot.addEventListener("click", async (e) => {
             const target = e.target;
 
-            if (target.closest('.close-btn') || target.closest('.cancel-btn') || target.classList.contains('overlay')) {
+            if (
+                target.closest(".close-btn") ||
+                target.closest(".cancel-btn") ||
+                target.classList.contains("overlay")
+            ) {
                 this.remove();
             }
 
-            if (target.closest('.save-username-btn')) {
-                const tokenInput = this.shadowRoot.querySelector('#gh-token-input');
-                const token = tokenInput ? tokenInput.value.trim() : '';
+            if (target.closest(".save-username-btn")) {
+                const tokenInput =
+                    this.shadowRoot.querySelector("#gh-token-input");
+                const token = tokenInput ? tokenInput.value.trim() : "";
                 if (token) {
                     this.state.token = token;
-                    this.saveData('', token);
+                    this.saveData("", token);
                     await this.fetchRepositories();
                 } else {
-                    this.state.error = 'Please enter your GitHub token';
+                    this.state.error = "Please enter your GitHub token";
                     this.render();
                 }
             }
 
-            if (target.closest('.change-link')) {
-                this.state.view = 'setup';
+            if (target.closest(".change-link")) {
+                this.state.view = "setup";
                 this.state.error = null;
                 this.render();
             }
 
-            const repoItem = target.closest('.repo-item');
+            const repoItem = target.closest(".repo-item");
             if (repoItem) {
                 const repoId = parseInt(repoItem.dataset.id);
-                this.state.selectedRepo = this.state.repositories.find(r => r.id === repoId);
+                this.state.selectedRepo = this.state.repositories.find(
+                    (r) => r.id === repoId,
+                );
                 this.render();
             }
 
-            if (target.closest('.import-btn') && this.state.selectedRepo) {
+            if (target.closest(".import-btn") && this.state.selectedRepo) {
                 this.fillForm(this.state.selectedRepo);
                 this.remove();
             }
         });
 
-        this.shadowRoot.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.id === 'gh-username-input') {
-                this.shadowRoot.querySelector('.save-username-btn')?.click();
+        this.shadowRoot.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && e.target.id === "gh-username-input") {
+                this.shadowRoot.querySelector(".save-username-btn")?.click();
             }
-            if (e.key === 'Escape') {
+            if (e.key === "Escape") {
                 this.remove();
             }
         });
     }
 
     fillForm(repo) {
-        const titleInput = document.querySelector('input[placeholder="Give your project a name"]');
+        const titleInput = document.querySelector(
+            'input[placeholder="Give your project a name"]',
+        );
         if (titleInput) {
             titleInput.value = repo.name;
-            titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+            titleInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
-        const demoLinkInput = document.querySelector('input[placeholder*="flavortown.cooked.selfhosted"]');
+        const demoLinkInput = document.querySelector(
+            'input[placeholder*="flavortown.cooked.selfhosted"]',
+        );
         if (demoLinkInput) {
             demoLinkInput.value = repo.homepage || repo.html_url;
-            demoLinkInput.dispatchEvent(new Event('input', { bubbles: true }));
+            demoLinkInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
-        const repoInput = document.querySelector('input[placeholder*="github.com/hackclub"]');
+        const repoInput = document.querySelector(
+            'input[placeholder*="github.com/hackclub"]',
+        );
         if (repoInput) {
             repoInput.value = repo.html_url;
-            repoInput.dispatchEvent(new Event('input', { bubbles: true }));
+            repoInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
         const readmeUrl = `https://raw.githubusercontent.com/${repo.full_name}/refs/heads/${repo.default_branch}/README.md`;
-        const readmeInput = document.querySelector('input[placeholder*="raw.githubusercontent"]');
+        const readmeInput = document.querySelector(
+            'input[placeholder*="raw.githubusercontent"]',
+        );
         if (readmeInput) {
             readmeInput.value = readmeUrl;
-            readmeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            readmeInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
-        this.showNotification('Project imported! Please fill in the description manually.', 'success');
+        this.showNotification(
+            "Project imported! Please fill in the description manually.",
+            "success",
+        );
 
         trackExtensionUsage();
     }
 
     showNotification(message, type) {
-        const existing = document.querySelector('.gh-export-notification');
+        const existing = document.querySelector(".gh-export-notification");
         if (existing) existing.remove();
 
-        const notification = document.createElement('div');
-        notification.className = 'gh-export-notification';
+        const notification = document.createElement("div");
+        notification.className = "gh-export-notification";
         notification.textContent = message;
         notification.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            background-color: ${type === 'success' ? '#238636' : '#f85149'};
+            background-color: ${type === "success" ? "#238636" : "#f85149"};
             color: white;
             padding: 12px 20px;
             border-radius: 8px;
@@ -583,7 +610,7 @@ class GitHubImportModal extends HTMLElement {
             animation: slideIn 0.3s ease-out;
         `;
 
-        const style = document.createElement('style');
+        const style = document.createElement("style");
         style.textContent = `
             @keyframes slideIn {
                 from { transform: translateX(100%); opacity: 0; }
@@ -594,7 +621,7 @@ class GitHubImportModal extends HTMLElement {
         document.body.appendChild(notification);
 
         setTimeout(() => {
-            notification.style.animation = 'slideIn 0.3s ease-out reverse';
+            notification.style.animation = "slideIn 0.3s ease-out reverse";
             setTimeout(() => notification.remove(), 300);
         }, 4000);
     }
@@ -604,7 +631,8 @@ class GitHubImportModal extends HTMLElement {
     }
 
     render() {
-        const { view, username, repositories, selectedRepo, isLoading, error } = this.state;
+        const { view, username, repositories, selectedRepo, isLoading, error } =
+            this.state;
 
         this.shadowRoot.innerHTML = `
             <style>${this.getStyles()}</style>
@@ -621,14 +649,14 @@ class GitHubImportModal extends HTMLElement {
                     </header>
 
                     <div class="content">
-                        ${isLoading ? this.renderLoading() : ''}
-                        ${!isLoading && view === 'setup' ? this.renderSetup() : ''}
-                        ${!isLoading && view === 'list' ? this.renderRepoList() : ''}
+                        ${isLoading ? this.renderLoading() : ""}
+                        ${!isLoading && view === "setup" ? this.renderSetup() : ""}
+                        ${!isLoading && view === "list" ? this.renderRepoList() : ""}
                     </div>
 
                     <footer class="footer">
                         <button class="btn btn-secondary cancel-btn">Cancel</button>
-                        <button class="btn btn-primary import-btn" ${selectedRepo ? '' : 'disabled'}>
+                        <button class="btn btn-primary import-btn" ${selectedRepo ? "" : "disabled"}>
                             ${this.getGitHubLogo()}
                             Import Project
                         </button>
@@ -650,7 +678,8 @@ class GitHubImportModal extends HTMLElement {
     }
 
     renderSetup() {
-        const createTokenUrl = 'https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=public_repo';
+        const createTokenUrl =
+            "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=public_repo";
         return `
             <div class="setup-view">
                 <div class="form-group">
@@ -667,7 +696,7 @@ class GitHubImportModal extends HTMLElement {
                         <a href="${createTokenUrl}" target="_blank" style="color: var(--color-accent-fg);">Create a token</a> — click "Generate token" at the bottom of the page.
                     </p>
                 </div>
-                ${this.state.error ? `<p class="error-text">${this.state.error}</p>` : ''}
+                ${this.state.error ? `<p class="error-text">${this.state.error}</p>` : ""}
                 <button class="btn btn-primary save-username-btn" style="width: 100%; margin-top: 12px;">Load Repositories</button>
             </div>
         `;
@@ -701,18 +730,24 @@ class GitHubImportModal extends HTMLElement {
             </div>
 
             <div class="repo-list">
-                ${repositories.map(repo => `
-                    <div class="repo-item ${selectedRepo?.id === repo.id ? 'selected' : ''}" data-id="${repo.id}">
-                        <input type="radio" class="repo-radio" name="github-repo" ${selectedRepo?.id === repo.id ? 'checked' : ''}>
+                ${repositories
+                    .map(
+                        (repo) => `
+                    <div class="repo-item ${selectedRepo?.id === repo.id ? "selected" : ""}" data-id="${repo.id}">
+                        <input type="radio" class="repo-radio" name="github-repo" ${selectedRepo?.id === repo.id ? "checked" : ""}>
                         <div class="repo-details">
                             <div class="repo-name">${repo.name}</div>
                             <div class="repo-meta">
-                                ${repo.language ? `
+                                ${
+                                    repo.language
+                                        ? `
                                     <span class="lang-badge">
                                         <span class="lang-dot" style="background-color: ${repo.langColor}"></span>
                                         ${repo.language}
                                     </span>
-                                ` : ''}
+                                `
+                                        : ""
+                                }
                                 <span class="star-count">
                                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path></svg>
                                     ${repo.stars.toLocaleString()}
@@ -720,27 +755,30 @@ class GitHubImportModal extends HTMLElement {
                             </div>
                         </div>
                     </div>
-                `).join('')}
+                `,
+                    )
+                    .join("")}
             </div>
         `;
     }
 }
 
-if (!customElements.get('github-import-modal')) {
-    customElements.define('github-import-modal', GitHubImportModal);
+if (!customElements.get("github-import-modal")) {
+    customElements.define("github-import-modal", GitHubImportModal);
 }
 
 function injectImportButton() {
-    if (document.querySelector('#gh-import-btn')) return;
+    if (document.querySelector("#gh-import-btn")) return;
 
     // Find the exact heading element
-    const heading = Array.from(document.querySelectorAll('h1, h2, h3, [role="heading"]'))
-        .find(el => el.textContent.trim() === 'Create a new Project');
+    const heading = Array.from(
+        document.querySelectorAll('h1, h2, h3, [role="heading"]'),
+    ).find((el) => el.textContent.trim() === "Create a new Project");
 
     if (!heading) return;
 
-    const button = document.createElement('button');
-    button.id = 'gh-import-btn';
+    const button = document.createElement("button");
+    button.id = "gh-import-btn";
     button.innerHTML = `
         <svg height="14" width="14" viewBox="0 0 16 16" style="fill: currentColor; margin-right: 4px;">
             <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
@@ -764,28 +802,28 @@ function injectImportButton() {
         vertical-align: middle;
     `;
 
-    button.addEventListener('mouseenter', () => {
-        button.style.backgroundColor = '#32383f';
+    button.addEventListener("mouseenter", () => {
+        button.style.backgroundColor = "#32383f";
     });
-    button.addEventListener('mouseleave', () => {
-        button.style.backgroundColor = '#24292f';
+    button.addEventListener("mouseleave", () => {
+        button.style.backgroundColor = "#24292f";
     });
 
-    button.addEventListener('click', () => {
-        if (!document.querySelector('github-import-modal')) {
-            const modal = document.createElement('github-import-modal');
+    button.addEventListener("click", () => {
+        if (!document.querySelector("github-import-modal")) {
+            const modal = document.createElement("github-import-modal");
             document.body.appendChild(modal);
         }
     });
 
     // Insert button inside the heading, at the end
-    heading.style.display = 'inline-flex';
-    heading.style.alignItems = 'center';
+    heading.style.display = "inline-flex";
+    heading.style.alignItems = "center";
     heading.appendChild(button);
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectImportButton);
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", injectImportButton);
 } else {
     injectImportButton();
 }

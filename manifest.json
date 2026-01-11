@@ -1,38 +1,36 @@
 {
-  "manifest_version": 3,
-  "name": "Flavortown GitHub Exporter",
-  "version": "1.1.0",
-  "description": "Import your GitHub projects to Flavortown with one click",
-  "icons": {
-    "16": "icons/GitHub_dark.svg",
-    "32": "icons/GitHub_dark.svg",
-    "48": "icons/GitHub_dark.svg",
-    "128": "icons/GitHub_dark.svg"
-  },
-  "permissions": [
-    "storage"
-  ],
-  "host_permissions": [
-    "https://api.github.com/*",
-    "https://flavortown.hackclub.com/*"
-  ],
-  "content_scripts": [
-    {
-      "matches": ["https://flavortown.hackclub.com/projects/new*"],
-      "js": ["content/content.js"],
-      "run_at": "document_end"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["content/injected.js"],
-      "matches": ["https://flavortown.hackclub.com/*"]
-    }
-  ],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "flavortown-github-exporter@hackclub.com",
-      "strict_min_version": "109.0"
-    }
-  }
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "flavortown-github-exporter@hackclub.com",
+            "strict_min_version": "109.0"
+        }
+    },
+    "content_scripts": [
+        {
+            "js": ["content/content.js"],
+            "matches": ["https://flavortown.hackclub.com/projects/new*"],
+            "run_at": "document_end"
+        }
+    ],
+    "description": "Import your GitHub projects to Flavortown with one click",
+    "host_permissions": [
+        "https://api.github.com/*",
+        "https://flavortown.hackclub.com/*"
+    ],
+    "icons": {
+        "128": "icons/logo.svg",
+        "16": "icons/logo.svg",
+        "32": "icons/logo.svg",
+        "48": "icons/logo.svg"
+    },
+    "manifest_version": 3,
+    "name": "Flavortown GitHub Exporter",
+    "permissions": ["storage"],
+    "version": "1.1.0",
+    "web_accessible_resources": [
+        {
+            "matches": ["https://flavortown.hackclub.com/*"],
+            "resources": ["content/injected.js"]
+        }
+    ]
 }

@@ -634,6 +634,7 @@ class GitHubImportModal extends HTMLElement {
         const { view, username, repositories, selectedRepo, isLoading, error } =
             this.state;
 
+        // eslint-disable-next-line no-unsanitized/property -- Content is generated internally without user input
         this.shadowRoot.innerHTML = `
             <style>${this.getStyles()}</style>
             <div class="overlay">

@@ -5,7 +5,7 @@
 **Import your GitHub projects to Flavortown with one click**
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Available-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/ohkkaaibkhikfeemhpfpdhbpopjngaia?utm_source=item-share-cb)
-[![Firefox](https://img.shields.io/badge/Firefox-Coming%20Soon-orange?style=for-the-badge&logo=firefox&logoColor=white)](#)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Available-brightgreen?style=for-the-badge&logo=firefox&logoColor=white)](https://addons.mozilla.org/fr/firefox/addon/flavortown-github-exporter/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](#)
 
 </div>
@@ -41,7 +41,9 @@
 
 ### Firefox
 
-🦊 **Firefox version coming soon!** We're currently working on bringing this extension to Firefox users.
+1. Visit the [Firefox Add-ons Store](https://addons.mozilla.org/fr/firefox/addon/flavortown-github-exporter/)
+2. Click **"Add to Firefox"**
+3. Confirm the installation
 
 ---
 
@@ -149,6 +151,7 @@ Built with ❤️ for the [Hack Club](https://hackclub.com/) community
 
 **Links:**
 - [Chrome Web Store](https://chromewebstore.google.com/detail/ohkkaaibkhikfeemhpfpdhbpopjngaia?utm_source=item-share-cb)
+- [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/addon/flavortown-github-exporter/)
 - [Flavortown](https://flavortown.hackclub.com/)
 - [Report an Issue](https://github.com/yourusername/flavortown-github-exporter/issues)
 

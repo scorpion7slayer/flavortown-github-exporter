@@ -143,6 +143,8 @@ Project details are automatically populated, saving you time and effort.
 
 MIT License - feel free to use this extension however you'd like!
 
+Copyright (c) 2026 scorpion7slayer
+
 ---
 
 ## 🌟 Credits

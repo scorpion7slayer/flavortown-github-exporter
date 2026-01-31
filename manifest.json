@@ -18,6 +18,15 @@
             "run_at": "document_end"
         }
     ],
+    "declarative_net_request": {
+        "rule_resources": [
+            {
+                "enabled": true,
+                "id": "ollama_rules",
+                "path": "rules/ollama_rules.json"
+            }
+        ]
+    },
     "description": "Import your GitHub projects to Flavortown with one click and auto-generate descriptions with AI",
     "host_permissions": [
         "https://api.github.com/*",
@@ -28,7 +37,7 @@
         "http://127.0.0.1/*",
         "https://api.openai.com/*",
         "https://api.anthropic.com/*",
-        "https://openrouter.ai/*",
+        "https://openrouter.ai/*"
     ],
     "icons": {
         "128": "icons/icon128.png",
@@ -38,15 +47,6 @@
     },
     "manifest_version": 3,
     "name": "Flavortown GitHub Exporter",
-    "declarative_net_request": {
-        "rule_resources": [
-            {
-                "id": "ollama_rules",
-                "enabled": true,
-                "path": "rules/ollama_rules.json"
-            }
-        ]
-    },
     "permissions": ["storage", "declarativeNetRequest"],
     "version": "2.0.0",
     "web_accessible_resources": [

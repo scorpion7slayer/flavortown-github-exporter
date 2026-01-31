@@ -29,7 +29,6 @@
         "https://api.openai.com/*",
         "https://api.anthropic.com/*",
         "https://openrouter.ai/*",
-        "https://telegra.ph/*"
     ],
     "icons": {
         "128": "icons/icon128.png",

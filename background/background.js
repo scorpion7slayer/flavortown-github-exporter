@@ -254,12 +254,15 @@ async function fetchModels(settings, githubToken) {
                 return { models: FALLBACK_MODELS, error: null };
             }
 
+            // Try to fetch available models from GitHub Models API
             try {
                 const resp = await fetch(
-                    "https://models.github.ai/inference/models",
+                    "https://models.github.ai/catalog/models",
                     {
                         headers: {
                             Authorization: `Bearer ${githubToken}`,
+                            Accept: "application/vnd.github+json",
+                            "X-GitHub-Api-Version": "2022-11-28",
                         },
                     },
                 );
@@ -269,6 +272,7 @@ async function fetchModels(settings, githubToken) {
                 if (!Array.isArray(rawModels) || rawModels.length === 0) {
                     throw new Error("Empty response");
                 }
+                
                 const models = rawModels
                     .filter((m) => m.id)
                     .map((m) => ({
@@ -282,8 +286,8 @@ async function fetchModels(settings, githubToken) {
                         return a.name.localeCompare(b.name);
                     });
                 return { models, error: null };
-            } catch (_) {
-                return { models: FALLBACK_MODELS, error: null };
+            } catch (e) {
+                return { models: FALLBACK_MODELS, error: `Could not fetch models: ${e.message}` };
             }
         }
 

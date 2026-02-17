@@ -70,7 +70,7 @@ const AI_PROVIDERS = {
     },
     openrouter: {
         name: "OpenRouter",
-        description: "Requires API key - free models available",
+        description: "Requires API key - free models only",
         requiresApiKey: true,
         dynamicModels: true,
         fallbackModels: [
@@ -206,6 +206,9 @@ class AISettingsModal extends HTMLElement {
         this.dynamicModels = [];
         this.modelsLoading = false;
         this.modelsError = null;
+        this._listenerAC = null;
+        this._loadGeneration = 0;
+        this._modelDropdownOpen = false;
     }
 
     async connectedCallback() {
@@ -213,7 +216,6 @@ class AISettingsModal extends HTMLElement {
         if (saved) {
             this.settings = { ...this.settings, ...saved };
         }
-        // Pre-set loading state before first render to avoid flicker
         const providerDef = AI_PROVIDERS[this.settings.provider];
         if (providerDef.dynamicModels) {
             this.modelsLoading = true;
@@ -228,23 +230,21 @@ class AISettingsModal extends HTMLElement {
     }
 
     async loadModels(skipLoadingRender = false) {
+        const generation = ++this._loadGeneration;
         const providerDef = AI_PROVIDERS[this.settings.provider];
         if (!providerDef.dynamicModels) {
             this.dynamicModels = providerDef.fallbackModels;
-            if (!skipLoadingRender) {
-                this.render();
-                this.addEventListeners();
-            }
+            this._updateModelSection();
             return;
         }
         this.modelsLoading = true;
         this.modelsError = null;
         if (!skipLoadingRender) {
-            this.render();
-            this.addEventListeners();
+            this._updateModelSection();
         }
 
         const result = await AIDescriptionService.fetchModels(this.settings);
+        if (generation !== this._loadGeneration) return;
         this.modelsLoading = false;
         if (result.error) {
             this.modelsError = result.error;
@@ -253,11 +253,75 @@ class AISettingsModal extends HTMLElement {
             this.dynamicModels = result.models || providerDef.fallbackModels;
         }
         if (!this.settings.model && this.dynamicModels.length > 0) {
-            this.settings.model = this.dynamicModels[0].id;
+            if (this.settings.provider === "openrouter") {
+                const freeRouter = this.dynamicModels.find((m) => m.id === "openrouter/free");
+                this.settings.model = freeRouter ? freeRouter.id : this.dynamicModels[0].id;
+            } else {
+                this.settings.model = this.dynamicModels[0].id;
+            }
         }
-        // Ne re-render qu'une seule fois après le chargement
-        this.render();
-        this.addEventListeners();
+        this._modelDropdownOpen = false;
+        this._updateModelSection();
+    }
+
+    _renderModelSectionContent() {
+        const providerDef = AI_PROVIDERS[this.settings.provider];
+        let html = "";
+
+        html += `<label for="ai-model-select" style="margin-bottom:8px;display:block;">Model</label>`;
+        html += `<div style="display:flex;gap:8px;align-items:stretch;">`;
+
+        if (this.modelsLoading) {
+            html += `<div style="flex:1;padding:12px;background:var(--color-bg-subtle);border:1px solid var(--color-border-default);border-radius:6px;color:var(--color-fg-muted);font-size:13px;display:flex;align-items:center;">
+                <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--color-fg-muted);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin-right:8px;flex-shrink:0;"></span>
+                Loading models...
+            </div>`;
+        } else {
+            let models = this.dynamicModels.length > 0 ? this.dynamicModels : providerDef.fallbackModels;
+            if (this.settings.freeOnly) models = models.filter((m) => m.free);
+            const isOpenRouter = this.settings.provider === "openrouter";
+
+            if (models.length > 0) {
+                const selectedModel = models.find((m) => m.id === this.settings.model) || models[0];
+                html += `<div class="model-dropdown">
+                    <button type="button" class="model-dropdown-trigger${this._modelDropdownOpen ? " open" : ""}">
+                        <span>${selectedModel.name}</span>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+                    </button>
+                    <div class="model-dropdown-list${this._modelDropdownOpen ? " open" : ""}">
+                        ${models.map((m) => `<div class="model-dropdown-item${this.settings.model === m.id ? " selected" : ""}" data-value="${m.id}">${m.name}${m.free && !isOpenRouter ? " (Free)" : ""}</div>`).join("")}
+                    </div>
+                </div>`;
+            } else {
+                html += `<div style="flex:1;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.4);border-radius:6px;color:var(--color-danger-fg);font-size:13px;">No models available${this.settings.freeOnly ? " (try disabling Free only)" : ""}</div>`;
+            }
+        }
+
+        html += `<div style="display:flex;gap:6px;">`;
+        if (providerDef.hasFreeOnlyToggle) {
+            html += `<button class="btn-free-only" style="padding:8px 12px;font-size:12px;border-radius:6px;cursor:pointer;border:1px solid;font-family:inherit;white-space:nowrap;${this.settings.freeOnly ? "background:rgba(46,160,67,0.2);border-color:#2ea043;color:#2ea043;font-weight:500;" : "background:var(--color-bg-subtle);border-color:var(--color-border-default);color:var(--color-fg-muted);"}">Free only</button>`;
+        }
+        if (providerDef.dynamicModels) {
+            html += `<button class="btn-refresh" title="Refresh models" style="padding:8px 12px;font-size:12px;border-radius:6px;cursor:pointer;white-space:nowrap;background:var(--color-bg-subtle);border:1px solid var(--color-border-default);color:var(--color-fg-muted);font-family:inherit;">&#8635; Refresh</button>`;
+        }
+        html += `</div></div>`;
+
+        if (this.modelsError) {
+            html += `<span class="helper-text" style="color:var(--color-danger-fg);margin-top:6px;display:block;">${this.modelsError}</span>`;
+        }
+
+        return html;
+    }
+
+    _updateModelSection() {
+        const container = this.shadowRoot.querySelector("#model-section-container");
+        if (!container) {
+            this.render();
+            this.addEventListeners();
+            return;
+        }
+        // eslint-disable-next-line no-unsanitized/property
+        container.innerHTML = this._renderModelSectionContent();
     }
 
     getStyles() {
@@ -496,10 +560,85 @@ class AISettingsModal extends HTMLElement {
                 border-top: 1px solid var(--color-border-muted);
                 margin: 4px 0;
             }
+
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
+            .model-dropdown { position: relative; flex: 1; min-width: 0; }
+
+            .model-dropdown-trigger {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 10px 12px;
+                font-size: 13px;
+                border-radius: 6px;
+                border: 1px solid var(--color-border-default);
+                background: var(--color-bg-subtle);
+                color: var(--color-fg-default);
+                cursor: pointer;
+                font-family: inherit;
+                text-align: left;
+                transition: border-color 0.2s, box-shadow 0.2s;
+            }
+            .model-dropdown-trigger:hover { border-color: var(--color-accent-fg); }
+            .model-dropdown-trigger.open {
+                border-color: var(--color-accent-fg);
+                box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+            }
+            .model-dropdown-trigger span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .model-dropdown-trigger svg { flex-shrink: 0; transition: transform 0.15s; }
+            .model-dropdown-trigger.open svg { transform: rotate(180deg); }
+
+            .model-dropdown-list {
+                display: none;
+                position: fixed;
+                background: var(--color-bg-overlay);
+                border: 1px solid var(--color-accent-fg);
+                border-radius: 6px;
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 2147483647;
+                box-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
+            }
+            .model-dropdown-list.open { display: block; }
+
+            .model-dropdown-list::-webkit-scrollbar { width: 6px; }
+            .model-dropdown-list::-webkit-scrollbar-track { background: var(--color-bg-overlay); }
+            .model-dropdown-list::-webkit-scrollbar-thumb {
+                background: var(--color-border-default);
+                border-radius: 3px;
+            }
+            .model-dropdown-list::-webkit-scrollbar-thumb:hover { background: var(--color-fg-muted); }
+
+            .model-dropdown-item {
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size: 13px;
+                color: var(--color-fg-default);
+                transition: background 0.1s;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .model-dropdown-item:hover { background: var(--color-bg-subtle); }
+            .model-dropdown-item.selected {
+                background: rgba(88, 166, 255, 0.12);
+                color: var(--color-accent-fg);
+                font-weight: 500;
+            }
         `;
     }
 
     addEventListeners() {
+        if (this._listenerAC) this._listenerAC.abort();
+        this._listenerAC = new AbortController();
+        const { signal } = this._listenerAC;
+
         this.shadowRoot.addEventListener("click", (e) => {
             if (
                 e.target.closest(".close-btn") ||
@@ -507,7 +646,62 @@ class AISettingsModal extends HTMLElement {
             ) {
                 this.remove();
             }
-        });
+            if (e.target.closest(".model-dropdown-trigger")) {
+                this._modelDropdownOpen = !this._modelDropdownOpen;
+                const trigger = this.shadowRoot.querySelector(".model-dropdown-trigger");
+                const list = this.shadowRoot.querySelector(".model-dropdown-list");
+                if (trigger) trigger.classList.toggle("open", this._modelDropdownOpen);
+                if (list) {
+                    list.classList.toggle("open", this._modelDropdownOpen);
+                    if (this._modelDropdownOpen && trigger) {
+                        const rect = trigger.getBoundingClientRect();
+                        list.style.top = `${rect.bottom + 2}px`;
+                        list.style.left = `${rect.left}px`;
+                        list.style.width = `${rect.width}px`;
+                        const selected = list.querySelector(".model-dropdown-item.selected");
+                        if (selected) selected.scrollIntoView({ block: "nearest" });
+                    }
+                }
+                return;
+            }
+            const item = e.target.closest(".model-dropdown-item");
+            if (item) {
+                const newModel = item.dataset.value;
+                this._modelDropdownOpen = false;
+                if (newModel !== this.settings.model) {
+                    this.settings.model = newModel;
+                    this._updateModelSection();
+                } else {
+                    const trigger = this.shadowRoot.querySelector(".model-dropdown-trigger");
+                    const list = this.shadowRoot.querySelector(".model-dropdown-list");
+                    if (trigger) trigger.classList.remove("open");
+                    if (list) list.classList.remove("open");
+                }
+                return;
+            }
+            // Fermer le dropdown si clic en dehors
+            if (this._modelDropdownOpen && !e.target.closest(".model-dropdown")) {
+                this._modelDropdownOpen = false;
+                const trigger = this.shadowRoot.querySelector(".model-dropdown-trigger");
+                const list = this.shadowRoot.querySelector(".model-dropdown-list");
+                if (trigger) trigger.classList.remove("open");
+                if (list) list.classList.remove("open");
+            }
+            if (e.target.closest(".btn-refresh")) {
+                this.loadModels();
+            }
+            if (e.target.closest(".btn-free-only")) {
+                this.settings.freeOnly = !this.settings.freeOnly;
+                this._updateModelSection();
+            }
+            if (e.target.closest("#open-prompt-settings")) {
+                showPromptSettingsModal(this.settings, (updated) => {
+                    Object.assign(this.settings, updated);
+                    this.render();
+                    this.addEventListeners();
+                });
+            }
+        }, { signal });
 
         this.shadowRoot.addEventListener("change", (e) => {
             if (e.target.id === "ai-provider-select") {
@@ -517,7 +711,12 @@ class AISettingsModal extends HTMLElement {
                 this.settings.freeOnly = false;
                 this.testStatus = null;
                 this.dynamicModels = [];
-                this.loadModels(true); // Skip loading render to avoid flicker
+                this._modelDropdownOpen = false;
+                const newProviderDef = AI_PROVIDERS[this.settings.provider];
+                if (newProviderDef.dynamicModels) this.modelsLoading = true;
+                this.render();
+                this.addEventListeners();
+                this.loadModels(true);
             }
             if (e.target.id === "ai-model-select") {
                 this.settings.model = e.target.value;
@@ -528,8 +727,9 @@ class AISettingsModal extends HTMLElement {
             if (e.target.id === "ai-prompt-preset") {
                 this.settings.promptPreset = e.target.value;
                 this.render();
+                this.addEventListeners();
             }
-        });
+        }, { signal });
 
         this.shadowRoot.addEventListener("input", (e) => {
             if (e.target.id === "ai-api-key") {
@@ -544,11 +744,11 @@ class AISettingsModal extends HTMLElement {
             if (e.target.id === "ai-custom-prompt") {
                 this.settings.customPrompt = e.target.value;
             }
-        });
+        }, { signal });
 
         this.shadowRoot.addEventListener("keydown", (e) => {
             if (e.key === "Escape") this.remove();
-        });
+        }, { signal });
 
         const testBtn = this.shadowRoot.querySelector(".btn-test");
         if (testBtn) {
@@ -562,7 +762,7 @@ class AISettingsModal extends HTMLElement {
                 this.testStatus = result;
                 this.render();
                 this.addEventListeners();
-            });
+            }, { signal });
         }
 
         const saveBtn = this.shadowRoot.querySelector(".save-btn");
@@ -571,34 +771,7 @@ class AISettingsModal extends HTMLElement {
                 await AIDescriptionService.saveSettings(this.settings);
                 this.remove();
                 showGlobalNotification("AI settings saved!", "success");
-            });
-        }
-
-        const refreshBtn = this.shadowRoot.querySelector(".btn-refresh");
-        if (refreshBtn) {
-            refreshBtn.addEventListener("click", () => this.loadModels());
-        }
-
-        const freeOnlyBtn = this.shadowRoot.querySelector(".btn-free-only");
-        if (freeOnlyBtn) {
-            freeOnlyBtn.addEventListener("click", () => {
-                this.settings.freeOnly = !this.settings.freeOnly;
-                this.render();
-                this.addEventListeners();
-            });
-        }
-
-        const promptSettingsBtn = this.shadowRoot.querySelector(
-            "#open-prompt-settings",
-        );
-        if (promptSettingsBtn) {
-            promptSettingsBtn.addEventListener("click", () => {
-                showPromptSettingsModal(this.settings, (updated) => {
-                    Object.assign(this.settings, updated);
-                    this.render();
-                    this.addEventListeners();
-                });
-            });
+            }, { signal });
         }
     }
 
@@ -716,78 +889,7 @@ class AISettingsModal extends HTMLElement {
         }
 
         // Dynamic model selector with loading state
-        html += `<div class="form-group">`;
-        html += `<label for="ai-model-select" style="margin-bottom:8px;display:block;">Model</label>`;
-        
-        // Model selector with better styling
-        html += `<div style="display:flex;gap:8px;align-items:stretch;">`;
-        
-        if (this.modelsLoading) {
-            html += `<div style="flex:1;padding:12px;background:var(--color-bg-subtle);border:1px solid var(--color-border-default);border-radius:6px;color:var(--color-fg-muted);font-size:13px;">
-                <span style="display:inline-block;width:16px;height:16px;border:2px solid var(--color-fg-muted);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-right:8px;vertical-align:middle;"></span>
-                Loading models...
-            </div>`;
-        } else {
-            let models =
-                this.dynamicModels.length > 0
-                    ? this.dynamicModels
-                    : providerDef.fallbackModels;
-
-            // Apply "Free only" filter
-            if (this.settings.freeOnly) {
-                models = models.filter((m) => m.free);
-            }
-
-            if (models.length > 0) {
-                html += `
-                    <select id="ai-model-select" style="flex:1;padding:10px 12px;font-size:14px;border-radius:6px;border:1px solid var(--color-border-default);background:var(--color-canvas-default);color:var(--color-fg-default);cursor:pointer;">
-                        ${models
-                            .map((m) => {
-                                return `<option value="${m.id}" ${this.settings.model === m.id ? "selected" : ""}>${m.name}${m.free ? " (Free)" : ""}</option>`;
-                            })
-                            .join("")}
-                    </select>
-                `;
-            } else {
-                html += `<div style="flex:1;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.4);border-radius:6px;color:var(--color-danger-fg);font-size:13px;">No models available${this.settings.freeOnly ? " (try disabling Free only)" : ""}</div>`;
-            }
-        }
-        
-        // Action buttons
-        html += `<div style="display:flex;gap:6px;">`;
-
-        // "Free only" toggle for OpenRouter
-        if (providerDef.hasFreeOnlyToggle) {
-            html += `
-                <button class="btn-free-only" style="
-                    padding:8px 12px;font-size:12px;border-radius:6px;cursor:pointer;border:1px solid;font-family:inherit;white-space:nowrap;
-                    ${this.settings.freeOnly ? "background:rgba(46,160,67,0.2);border-color:#2ea043;color:#2ea043;font-weight:500;" : "background:var(--color-bg-subtle);border-color:var(--color-border-default);color:var(--color-fg-muted);"}
-                ">Free only</button>
-            `;
-        }
-
-        // Refresh button
-        if (providerDef.dynamicModels) {
-            html += `
-                <button class="btn-refresh" title="Refresh models" style="
-                    padding:8px 12px;font-size:12px;border-radius:6px;cursor:pointer;white-space:nowrap;
-                    background:var(--color-bg-subtle);border:1px solid var(--color-border-default);color:var(--color-fg-muted);font-family:inherit;
-                ">&#8635; Refresh</button>
-            `;
-        }
-        html += `</div></div>`;
-
-        // Model count info
-        if (!this.modelsLoading && (this.dynamicModels.length > 0 || providerDef.fallbackModels.length > 0)) {
-            const totalModels = providerDef.fallbackModels.length;
-            const freeModels = providerDef.fallbackModels.filter(m => m.free).length;
-            html += `<div style="margin-top:6px;font-size:11px;color:var(--color-fg-muted);">${totalModels} models available${freeModels > 0 ? ` (${freeModels} free)` : ""}</div>`;
-        }
-
-        if (this.modelsError) {
-            html += `<span class="helper-text" style="color:var(--color-danger-fg);margin-top:6px;display:block;">${this.modelsError}</span>`;
-        }
-        html += `</div>`;
+        html += `<div class="form-group" id="model-section-container">${this._renderModelSectionContent()}</div>`;
 
         // Custom model input for Ollama
         if (provider === "ollama") {
@@ -1692,24 +1794,26 @@ class GitHubImportModal extends HTMLElement {
             }
 
             .change-link {
-                color: var(--color-accent-fg);
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 10px;
                 font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
                 cursor: pointer;
-                background: none;
-                border: none;
+                color: var(--color-fg-muted);
+                background: var(--color-bg-subtle);
+                border: 1px solid var(--color-border-default);
+                border-radius: 6px;
+                transition: color 0.15s, border-color 0.15s, background 0.15s;
             }
 
-            .change-link:hover { text-decoration: underline; }
-
-            .update-token-link {
-                color: var(--color-success-emphasis);
-                font-size: 12px;
-                cursor: pointer;
-                background: none;
-                border: none;
+            .change-link:hover {
+                color: var(--color-fg-default);
+                border-color: var(--color-fg-muted);
+                background: var(--color-btn-hover-bg);
             }
-
-            .update-token-link:hover { text-decoration: underline; }
 
             .repo-list {
                 display: flex;
@@ -1905,16 +2009,6 @@ class GitHubImportModal extends HTMLElement {
                     this.state.error = "Please enter your GitHub token";
                     this.render();
                 }
-            }
-
-            if (target.closest(".update-token-link")) {
-                window.open(
-                    "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=copilot,public_repo",
-                    "_blank",
-                );
-                this.state.view = "setup";
-                this.state.error = null;
-                this.render();
             }
 
             if (target.closest(".change-link")) {
@@ -2308,7 +2402,6 @@ class GitHubImportModal extends HTMLElement {
                         <span>${username}</span>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;">
-                    <button class="update-token-link" title="Update your token for Copilot AI access">Update token</button>
                     <button class="change-link">Change</button>
                 </div>
                 </div>
@@ -2325,7 +2418,6 @@ class GitHubImportModal extends HTMLElement {
                     <span>${username}</span>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                    <button class="update-token-link" title="Update your token for Copilot AI access">Update token</button>
                     <button class="change-link">Change</button>
                 </div>
             </div>

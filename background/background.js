@@ -511,19 +511,14 @@ async function fetchModels(settings, githubToken) {
             const data = await resp.json();
             const models = data.data
                 .filter((m) => m.id && m.name)
+                .filter((m) => m.pricing?.prompt === "0" && m.pricing?.completion === "0")
                 .map((m) => ({
                     id: m.id,
                     name: m.name || m.id,
-                    free:
-                        m.pricing?.prompt === "0" &&
-                        m.pricing?.completion === "0",
+                    free: true,
                     context: m.context_length,
                 }))
-                .sort((a, b) => {
-                    if (a.free && !b.free) return -1;
-                    if (!a.free && b.free) return 1;
-                    return a.name.localeCompare(b.name);
-                });
+                .sort((a, b) => a.name.localeCompare(b.name));
             return { models, error: null };
         }
 

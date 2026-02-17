@@ -4,10 +4,10 @@
 
 Only the latest published version of the **Flavortown GitHub Exporter** browser extension is actively supported with security fixes. Users are encouraged to always use the most recent version available on the Chrome Web Store or Firefox Add-ons Store.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest (1.5.x+) | ✅ Yes        |
-| < 1.5.0 | ❌ No              |
+| Version         | Supported |
+| --------------- | --------- |
+| Latest (1.5.x+) | ✅ Yes    |
+| < 1.5.0         | ❌ No     |
 
 ## Reporting a Vulnerability
 

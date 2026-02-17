@@ -69,9 +69,9 @@ const AI_PROVIDERS = {
         ],
     },
     openrouter: {
-        name: "OpenRouter (Free)",
-        description: "Free models available - no API key needed",
-        requiresApiKey: false,
+        name: "OpenRouter",
+        description: "Requires API key - free models available",
+        requiresApiKey: true,
         dynamicModels: true,
         hasFreeOnlyToggle: true,
         fallbackModels: [

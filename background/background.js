@@ -368,23 +368,28 @@ async function callProvider(settings, prompt, githubToken) {
 // ─── Dynamic Model Fetching ─────────────────────────────────────────────────
 
 // Known Copilot models with their free/paid status
-// These are the actual models available in GitHub Copilot (2026)
+// Based on official GitHub Copilot docs: https://docs.github.com/copilot/reference/ai-models/supported-models
+// Free models: 0 multiplier on paid plans, 1x on free plan
 const COPILOT_MODELS = [
     { id: "gpt-4.1", name: "GPT-4.1", free: true },
     { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
-    { id: "gpt-5.1", name: "GPT-5.1", free: true },
-    { id: "gpt-5.2", name: "GPT-5.2", free: false },
+    { id: "gpt-5", name: "GPT-5", free: false },
+    { id: "gpt-5.1", name: "GPT-5.1", free: false },
+    { id: "gpt-5-codex", name: "GPT-5 Codex", free: false },
     { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: true },
     { id: "claude-sonnet-4", name: "Claude Sonnet 4", free: false },
     { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
-    { id: "claude-opus-4.5", name: "Claude Opus 4.5", free: false },
+    { id: "claude-opus-4.1", name: "Claude Opus 4.1", free: false },
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
     { id: "gemini-3-flash", name: "Gemini 3 Flash", free: true },
     { id: "gemini-3-pro", name: "Gemini 3 Pro", free: false },
     { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
-    { id: "grok-code-2", name: "Grok Code 2", free: false },
     { id: "raptor-mini", name: "Raptor Mini", free: true },
-    { id: "raptor-large", name: "Raptor Large", free: false },
+    { id: "o1-mini", name: "o1-mini", free: false },
+    { id: "o3", name: "o3", free: false },
+    { id: "o3-mini", name: "o3-mini", free: false },
+    { id: "o4-mini", name: "o4-mini", free: false },
+    { id: "gpt-4o", name: "GPT-4o", free: false },
 ];
 
 // Copilot API endpoints

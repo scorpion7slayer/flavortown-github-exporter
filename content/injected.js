@@ -2242,12 +2242,22 @@ class GitHubImportModal extends HTMLElement {
                 ${
                     hasOAuthClientId
                         ? `
-                <div style="margin-bottom: 16px;">
-                    <button class="btn btn-primary oauth-login-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <div style="text-align: center; padding: 24px 16px;">
+                    <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: linear-gradient(135deg, #238636 0%, #2ea043 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);">
+                        ${this.getGitHubLogo()}
+                    </div>
+                    <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 600; color: var(--color-fg-default);">Connect to GitHub</h3>
+                    <p style="color: var(--color-fg-muted); margin: 0 0 20px; font-size: 13px; line-height: 1.5;">
+                        Sign in to import your repositories and generate AI descriptions
+                    </p>
+                    <button class="btn btn-primary oauth-login-btn" style="width: 100%; padding: 12px 20px; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #238636 0%, #2ea043 100%); border: none; border-radius: 8px; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 2px 8px rgba(35, 134, 54, 0.25);" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(35, 134, 54, 0.35)';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(35, 134, 54, 0.25)';">
                         ${this.getGitHubLogo()}
                         Sign in with GitHub
                     </button>
-                    ${this.state.error ? `<p class="error-text" style="margin-top: 8px;">${this.state.error}</p>` : ""}
+                    <p style="color: var(--color-fg-muted); margin: 16px 0 0; font-size: 12px;">
+                        Secure OAuth authentication
+                    </p>
+                    ${this.state.error ? `<p class="error-text" style="margin-top: 12px;">${this.state.error}</p>` : ""}
                 </div>
                 `
                         : `

@@ -195,13 +195,35 @@ async function callProvider(settings, prompt, githubToken) {
 
     switch (provider) {
         case "copilot": {
+            // Get Copilot token for API calls
+            let copilotToken = githubToken;
+            
+            try {
+                // Try to get a Copilot-specific token
+                const tokenResp = await fetch(`${COPILOT_API_BASE}/copilot_internal/v2/token`, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${githubToken}`,
+                        Accept: "application/json",
+                    },
+                });
+                
+                if (tokenResp.ok) {
+                    const tokenData = await tokenResp.json();
+                    copilotToken = tokenData.token || githubToken;
+                }
+            } catch (e) {
+                // Fall back to using GitHub token directly
+                console.warn("Could not get Copilot token:", e);
+            }
+            
             const resp = await fetch(
-                "https://models.github.ai/inference/chat/completions",
+                `${COPILOT_API_BASE}/inference/chat/completions`,
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${githubToken}`,
+                        Authorization: `Bearer ${copilotToken}`,
                     },
                     body: JSON.stringify({
                         model: model || "gpt-5-mini",
@@ -215,7 +237,7 @@ async function callProvider(settings, prompt, githubToken) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error(
                     err.error?.message ||
-                        `GitHub Copilot: ${resp.status}. Token needs 'models:read' scope.`,
+                        `GitHub Copilot: ${resp.status}. Check your Copilot subscription.`,
                 );
             }
             const data = await resp.json();
@@ -345,72 +367,156 @@ async function callProvider(settings, prompt, githubToken) {
 
 // ─── Dynamic Model Fetching ─────────────────────────────────────────────────
 
+// Known Copilot models - only most common/active ones
+// Based on official GitHub Copilot docs: https://docs.github.com/copilot/reference/ai-models/supported-models
+// Free models: 0 multiplier on paid plans (GPT-4.1, GPT-4o, GPT-5 mini, Grok Code Fast 1)
+const COPILOT_MODELS = [
+    { id: "gpt-4.1", name: "GPT-4.1", free: true },
+    { id: "gpt-4o", name: "GPT-4o", free: true },
+    { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
+    { id: "gpt-5", name: "GPT-5", free: false },
+    { id: "gpt-5.1", name: "GPT-5.1", free: false },
+    { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: false },
+    { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
+    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
+    { id: "gemini-3-flash", name: "Gemini 3 Flash", free: false },
+    { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
+];
+
+// Copilot API endpoints
+const COPILOT_API_BASE = "https://api.individual.githubcopilot.com";
+
+async function getCopilotSubscription(githubToken) {
+    try {
+        // Try to get Copilot token first
+        const tokenResp = await fetch(`${COPILOT_API_BASE}/copilot_internal/v2/token`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${githubToken}`,
+                Accept: "application/json",
+            },
+        });
+        
+        if (!tokenResp.ok) {
+            // Might be on business/enterprise plan, try alternative endpoint
+            const orgTokenResp = await fetch(`${COPILOT_API_BASE}/copilot_internal/v2/token`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${githubToken}`,
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+            });
+            
+            if (!orgTokenResp.ok) {
+                return { plan: "unknown", hasCopilot: false };
+            }
+            
+            const orgData = await orgTokenResp.json();
+            return { 
+                plan: orgData.plan_type || "business", 
+                hasCopilot: true,
+                token: orgData.token 
+            };
+        }
+        
+        const data = await tokenResp.json();
+        
+        // Extract plan from token or make a separate API call
+        // The token contains info like: tid=...;exp=...;plan=individual;...
+        const tokenInfo = data.token || "";
+        let plan = "individual"; // default
+        
+        if (tokenInfo.includes("plan=business") || tokenInfo.includes("plan=enterprise")) {
+            plan = tokenInfo.includes("plan=enterprise") ? "enterprise" : "business";
+        }
+        
+        return { plan, hasCopilot: true, token: data.token };
+    } catch (e) {
+        console.error("Failed to get Copilot subscription:", e);
+        return { plan: "unknown", hasCopilot: false };
+    }
+}
+
+async function fetchCopilotModels(githubToken) {
+    // First get subscription to know the plan
+    const { plan, hasCopilot } = await getCopilotSubscription(githubToken);
+    
+    if (!hasCopilot) {
+        // User doesn't have Copilot, return models marked as not free
+        return COPILOT_MODELS.map(m => ({ ...m, free: false }));
+    }
+    
+    // Try to fetch available models from Copilot API
+    try {
+        // Use the Copilot token to fetch available models
+        const { token } = await getCopilotSubscription(githubToken);
+        
+        if (token) {
+            // Try the models endpoint with Copilot token
+            const resp = await fetch(`${COPILOT_API_BASE}/models`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/json",
+                },
+            });
+            
+            if (resp.ok) {
+                const data = await resp.json();
+                const availableModels = data.models || [];
+                
+                // Mark models as available/unavailable based on Copilot API response
+                const availableIds = new Set(availableModels.map(m => m.id));
+                
+                return COPILOT_MODELS.map(m => ({
+                    ...m,
+                    available: availableIds.has(m.id),
+                    // On free plan, only certain models are truly free
+                    free: m.free && (plan === "individual" || plan === "unknown")
+                }));
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch Copilot models:", e);
+    }
+    
+    // Fallback: use static list with plan-based free determination
+    return COPILOT_MODELS.map(m => ({
+        ...m,
+        // Individual/free plan has limited free models
+        free: m.free && (plan === "individual" || plan === "unknown")
+    }));
+}
+
 async function fetchModels(settings, githubToken) {
     const { provider, apiKey, ollamaUrl } = settings;
 
     switch (provider) {
         case "copilot": {
-            // Known free models (0 premium request multiplier for Pro/Pro+)
-            // Known free models for GitHub Copilot (2026)
-            const FREE_COPILOT_MODELS = new Set([
-                "gpt-4.1",
-                "gpt-5-mini",
-                "claude-haiku-4.5",
-                "gemini-3-flash",
-                "raptor-mini",
-            ]);
-            const FALLBACK_MODELS = [
-                { id: "gpt-4.1", name: "GPT-4.1", free: true },
-                { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
-                { id: "gpt-5.1", name: "GPT-5.1", free: false },
-                { id: "gpt-5.2", name: "GPT-5.2", free: false },
-                { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: true },
-                { id: "claude-sonnet-4", name: "Claude Sonnet 4", free: false },
-                { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
-                { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
-                { id: "gemini-3-flash", name: "Gemini 3 Flash", free: true },
-                { id: "gemini-3-pro", name: "Gemini 3 Pro", free: false },
-                { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
-            ];
-
             if (!githubToken) {
-                return { models: FALLBACK_MODELS, error: null };
+                // No token - all models shown as not free
+                return { 
+                    models: COPILOT_MODELS.map(m => ({ ...m, free: false })), 
+                    error: null 
+                };
             }
 
-            // Try to fetch available models from GitHub Models API
             try {
-                const resp = await fetch(
-                    "https://models.github.ai/catalog/models",
-                    {
-                        headers: {
-                            Authorization: `Bearer ${githubToken}`,
-                            Accept: "application/vnd.github+json",
-                            "X-GitHub-Api-Version": "2022-11-28",
-                        },
-                    },
-                );
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const data = await resp.json();
-                const rawModels = data.data || data;
-                if (!Array.isArray(rawModels) || rawModels.length === 0) {
-                    throw new Error("Empty response");
-                }
+                const models = await fetchCopilotModels(githubToken);
                 
-                const models = rawModels
-                    .filter((m) => m.id)
-                    .map((m) => ({
-                        id: m.id,
-                        name: m.name || m.id,
-                        free: FREE_COPILOT_MODELS.has(m.id),
-                    }))
-                    .sort((a, b) => {
-                        if (a.free && !b.free) return -1;
-                        if (!a.free && b.free) return 1;
-                        return a.name.localeCompare(b.name);
-                    });
+                // Sort: free first, then by name
+                models.sort((a, b) => {
+                    if (a.free && !b.free) return -1;
+                    if (!a.free && b.free) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+                
                 return { models, error: null };
             } catch (e) {
-                return { models: FALLBACK_MODELS, error: `Could not fetch models: ${e.message}` };
+                return { 
+                    models: COPILOT_MODELS.map(m => ({ ...m, free: false })), 
+                    error: `Could not fetch Copilot models: ${e.message}` 
+                };
             }
         }
 

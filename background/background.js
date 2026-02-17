@@ -369,6 +369,7 @@ async function callProvider(settings, prompt, githubToken) {
 
 // Known Copilot models - only most common/active ones
 // Based on official GitHub Copilot docs: https://docs.github.com/copilot/reference/ai-models/supported-models
+// Note: raptor-mini is VS Code only, not available via API
 const COPILOT_MODELS = [
     { id: "gpt-4.1", name: "GPT-4.1", free: true },
     { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
@@ -379,7 +380,6 @@ const COPILOT_MODELS = [
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
     { id: "gemini-3-flash", name: "Gemini 3 Flash", free: true },
     { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
-    { id: "raptor-mini", name: "Raptor Mini", free: true },
 ];
 
 // Copilot API endpoints

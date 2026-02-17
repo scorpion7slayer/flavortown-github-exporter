@@ -50,17 +50,18 @@ const AI_PROVIDERS = {
     copilot: {
         name: "GitHub Copilot",
         description:
-            "Uses your GitHub token (classic token, copilot scope). Free models for Pro/Pro+ subscribers.",
+            "Uses OAuth authentication. Free models for Pro/Pro+ subscribers.",
         requiresApiKey: false,
         dynamicModels: true,
         fallbackModels: [
             { id: "gpt-4.1", name: "GPT-4.1", free: true },
             { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
             { id: "gpt-5.1", name: "GPT-5.1", free: false },
-            { id: "gpt-5.2", name: "GPT-5.2", free: false },
             { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
-            { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: false },
+            { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: true },
             { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
+            { id: "gemini-3-flash", name: "Gemini 3 Flash", free: true },
+            { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
         ],
     },
     ollama: {
@@ -730,14 +731,10 @@ class AISettingsModal extends HTMLElement {
 
         // GitHub Copilot info
         if (provider === "copilot") {
-            const tokenUrl =
-                "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=copilot,public_repo";
             html += `
                 <div class="form-group">
                     <span class="helper-text" style="padding:8px 12px;background:var(--color-bg-subtle);border-radius:6px;border:1px solid var(--color-border-default);">
-                        Uses your existing GitHub token. Requires a <strong style="color:var(--color-fg-default)">Token (classic)</strong> with the <strong style="color:var(--color-fg-default)">copilot</strong> scope.
-                        <br><span style="margin-top:4px;display:inline-block;">Free models are available for <strong style="color:var(--color-fg-default)">Copilot Pro</strong> and <strong style="color:var(--color-fg-default)">Pro+</strong> subscribers.</span>
-                        <a href="${tokenUrl}" target="_blank" style="color:var(--color-accent-fg);display:block;margin-top:4px;">Create a classic token with copilot scope</a>
+                        Uses OAuth authentication. Free models are available for <strong style="color:var(--color-fg-default)">Copilot Pro</strong> and <strong style="color:var(--color-fg-default)">Pro+</strong> subscribers.
                     </span>
                 </div>
             `;
@@ -2219,11 +2216,6 @@ class GitHubImportModal extends HTMLElement {
             return this.renderOAuthDeviceFlow();
         }
 
-        const classicTokenUrl =
-            "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=public_repo";
-        const copilotTokenUrl =
-            "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=copilot,public_repo";
-
         const hasOAuthClientId =
             GITHUB_OAUTH_CLIENT_ID && GITHUB_OAUTH_CLIENT_ID.length > 0;
 
@@ -2235,20 +2227,14 @@ class GitHubImportModal extends HTMLElement {
                 <div style="margin-bottom: 16px;">
                     <button class="btn btn-primary oauth-login-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         ${this.getGitHubLogo()}
-                        Sign in with GitHub
+                        Sign in with GitHub (OAuth)
                     </button>
                     <p class="helper-text" style="text-align: center; margin-top: 8px;">
-                        Recommended - Secure OAuth authentication
+                        Secure OAuth authentication - Token login disabled
                     </p>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
-                    <hr style="flex: 1; border: none; border-top: 1px solid var(--color-border-default);">
-                    <span style="color: var(--color-fg-muted); font-size: 12px;">OR</span>
-                    <hr style="flex: 1; border: none; border-top: 1px solid var(--color-border-default);">
-                </div>
                 `
-                        : ""
-                }
+                        : `
                 <div class="form-group">
                     <label for="gh-token-input">GitHub Token (Personal Access Token)</label>
                     <input
@@ -2257,20 +2243,16 @@ class GitHubImportModal extends HTMLElement {
                         placeholder="ghp_xxxxxxxxxxxx"
                         value="${this.state.token}"
                         autocomplete="off"
-                        ${hasOAuthClientId ? "" : "autofocus"}
+                        autofocus
                     >
                     <p class="helper-text">
-                        <a href="${classicTokenUrl}" target="_blank" style="color: var(--color-accent-fg);">Create a classic token</a> (repos only)
-                        &nbsp;or&nbsp;
-                        <a href="${copilotTokenUrl}" target="_blank" style="color: var(--color-accent-fg);">Create a Copilot token</a> (repos + AI)
-                    </p>
-                    <p class="helper-text" style="margin-top:4px;">
-                        Use a <strong>Token (classic)</strong>. For AI descriptions, add the <strong>copilot</strong> scope.
-                        Free models available for <strong>Copilot Pro</strong> and <strong>Pro+</strong> subscribers.
+                        <a href="https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=public_repo" target="_blank" style="color: var(--color-accent-fg);">Create a classic token</a>
                     </p>
                 </div>
                 ${this.state.error ? `<p class="error-text">${this.state.error}</p>` : ""}
                 <button class="btn btn-primary save-username-btn" style="width: 100%; margin-top: 12px;">Load Repositories</button>
+                `
+                }
             </div>
         `;
     }

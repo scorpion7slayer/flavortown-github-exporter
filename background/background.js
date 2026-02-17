@@ -195,35 +195,14 @@ async function callProvider(settings, prompt, githubToken) {
 
     switch (provider) {
         case "copilot": {
-            // Get Copilot token for API calls
-            let copilotToken = githubToken;
-            
-            try {
-                // Try to get a Copilot-specific token
-                const tokenResp = await fetch(`${COPILOT_API_BASE}/copilot_internal/v2/token`, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${githubToken}`,
-                        Accept: "application/json",
-                    },
-                });
-                
-                if (tokenResp.ok) {
-                    const tokenData = await tokenResp.json();
-                    copilotToken = tokenData.token || githubToken;
-                }
-            } catch (e) {
-                // Fall back to using GitHub token directly
-                console.warn("Could not get Copilot token:", e);
-            }
-            
+            // Use GitHub token directly with models.github.ai (supports CORS)
             const resp = await fetch(
                 `${COPILOT_API_BASE}/inference/chat/completions`,
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${copilotToken}`,
+                        Authorization: `Bearer ${githubToken}`,
                     },
                     body: JSON.stringify({
                         model: model || "gpt-5-mini",
@@ -387,109 +366,64 @@ const COPILOT_MODELS = [
     { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: false },
 ];
 
-// Copilot API endpoints
-const COPILOT_API_BASE = "https://api.individual.githubcopilot.com";
+// Copilot API endpoints - using models.github.ai (supports CORS)
+const COPILOT_API_BASE = "https://models.github.ai";
 
+// Simplified Copilot subscription check - uses models.github.ai API
 async function getCopilotSubscription(githubToken) {
     try {
-        // Try to get Copilot token first
-        const tokenResp = await fetch(`${COPILOT_API_BASE}/copilot_internal/v2/token`, {
-            method: "POST",
+        // Try to call the models API - if it works, user has Copilot access
+        const resp = await fetch(`${COPILOT_API_BASE}/catalog/models`, {
             headers: {
                 Authorization: `Bearer ${githubToken}`,
-                Accept: "application/json",
+                Accept: "application/vnd.github+json",
             },
         });
         
-        if (!tokenResp.ok) {
-            // Might be on business/enterprise plan, try alternative endpoint
-            const orgTokenResp = await fetch(`${COPILOT_API_BASE}/copilot_internal/v2/token`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${githubToken}`,
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                },
-            });
-            
-            if (!orgTokenResp.ok) {
-                return { plan: "unknown", hasCopilot: false };
-            }
-            
-            const orgData = await orgTokenResp.json();
-            return { 
-                plan: orgData.plan_type || "business", 
-                hasCopilot: true,
-                token: orgData.token 
-            };
+        if (resp.ok) {
+            return { hasCopilot: true, plan: "unknown" };
         }
         
-        const data = await tokenResp.json();
-        
-        // Extract plan from token or make a separate API call
-        // The token contains info like: tid=...;exp=...;plan=individual;...
-        const tokenInfo = data.token || "";
-        let plan = "individual"; // default
-        
-        if (tokenInfo.includes("plan=business") || tokenInfo.includes("plan=enterprise")) {
-            plan = tokenInfo.includes("plan=enterprise") ? "enterprise" : "business";
-        }
-        
-        return { plan, hasCopilot: true, token: data.token };
+        return { hasCopilot: false, plan: "none" };
     } catch (e) {
         console.error("Failed to get Copilot subscription:", e);
-        return { plan: "unknown", hasCopilot: false };
+        return { hasCopilot: false, plan: "unknown" };
     }
 }
 
 async function fetchCopilotModels(githubToken) {
-    // First get subscription to know the plan
-    const { plan, hasCopilot } = await getCopilotSubscription(githubToken);
+    // Check if user has Copilot
+    const { hasCopilot } = await getCopilotSubscription(githubToken);
     
     if (!hasCopilot) {
-        // User doesn't have Copilot, return models marked as not free
         return COPILOT_MODELS.map(m => ({ ...m, free: false }));
     }
     
-    // Try to fetch available models from Copilot API
+    // Try to fetch available models from GitHub Models API
     try {
-        // Use the Copilot token to fetch available models
-        const { token } = await getCopilotSubscription(githubToken);
+        const resp = await fetch(`${COPILOT_API_BASE}/catalog/models`, {
+            headers: {
+                Authorization: `Bearer ${githubToken}`,
+                Accept: "application/vnd.github+json",
+            },
+        });
         
-        if (token) {
-            // Try the models endpoint with Copilot token
-            const resp = await fetch(`${COPILOT_API_BASE}/models`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "application/json",
-                },
-            });
+        if (resp.ok) {
+            const data = await resp.json();
+            const availableModels = data.data || [];
+            const availableIds = new Set(availableModels.map(m => m.id));
             
-            if (resp.ok) {
-                const data = await resp.json();
-                const availableModels = data.models || [];
-                
-                // Mark models as available/unavailable based on Copilot API response
-                const availableIds = new Set(availableModels.map(m => m.id));
-                
-                return COPILOT_MODELS.map(m => ({
-                    ...m,
-                    available: availableIds.has(m.id),
-                    // On free plan, only certain models are truly free
-                    free: m.free && (plan === "individual" || plan === "unknown")
-                }));
-            }
+            return COPILOT_MODELS.map(m => ({
+                ...m,
+                available: availableIds.has(m.id)
+            }));
         }
     } catch (e) {
         console.error("Failed to fetch Copilot models:", e);
     }
     
-    // Fallback: use static list with plan-based free determination
-    return COPILOT_MODELS.map(m => ({
-        ...m,
-        // Individual/free plan has limited free models
-        free: m.free && (plan === "individual" || plan === "unknown")
-    }));
+    // Fallback to static list
+    return COPILOT_MODELS;
 }
 
 async function fetchModels(settings, githubToken) {

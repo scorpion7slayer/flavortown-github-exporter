@@ -1423,6 +1423,7 @@ class GitHubImportModal extends HTMLElement {
             oauthFlow: null, // { userCode, verificationUri, expiresIn, polling }
         };
         this._oauthPollInterval = null;
+        this._listenersAdded = false;
     }
 
     async connectedCallback() {
@@ -1859,6 +1860,7 @@ class GitHubImportModal extends HTMLElement {
                 margin-top: 12px;
             }
 
+
             @keyframes spin {
                 to { transform: rotate(360deg); }
             }
@@ -1870,6 +1872,8 @@ class GitHubImportModal extends HTMLElement {
     }
 
     addEventListeners() {
+        if (this._listenersAdded) return;
+        this._listenersAdded = true;
         this.shadowRoot.addEventListener("click", async (e) => {
             const target = e.target;
 
@@ -2098,10 +2102,7 @@ class GitHubImportModal extends HTMLElement {
             }, pollInterval);
         };
 
-        // Initial poll
-        setTimeout(poll, pollInterval);
-
-        // Continue polling
+        // Poll every interval (first poll fires after pollInterval ms)
         this._oauthPollInterval = setInterval(poll, pollInterval);
     }
 
@@ -2231,11 +2232,9 @@ class GitHubImportModal extends HTMLElement {
                 <div style="margin-bottom: 16px;">
                     <button class="btn btn-primary oauth-login-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         ${this.getGitHubLogo()}
-                        Sign in with GitHub (OAuth)
+                        Sign in with GitHub
                     </button>
-                    <p class="helper-text" style="text-align: center; margin-top: 8px;">
-                        Secure OAuth authentication - Token login disabled
-                    </p>
+                    ${this.state.error ? `<p class="error-text" style="margin-top: 8px;">${this.state.error}</p>` : ""}
                 </div>
                 `
                         : `
@@ -2265,40 +2264,41 @@ class GitHubImportModal extends HTMLElement {
         const { oauthFlow } = this.state;
         return `
             <div class="setup-view oauth-device-flow">
-                <div style="text-align: center; padding: 20px 0;">
-                    <h3 style="margin: 0 0 16px 0; color: var(--color-fg-default);">Connect to GitHub</h3>
-                    <p style="color: var(--color-fg-muted); margin-bottom: 20px;">
+                <div style="text-align: center; padding: 16px 0;">
+                    <h3 style="margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--color-fg-default);">Connect to GitHub</h3>
+                    <p style="color: var(--color-fg-muted); margin: 0 0 20px; font-size: 13px;">
                         Enter this code on GitHub to authorize the extension:
                     </p>
                     <div class="oauth-code" style="
-                        font-family: monospace;
-                        font-size: 32px;
-                        font-weight: bold;
-                        letter-spacing: 4px;
-                        background: var(--color-canvas-subtle);
-                        padding: 16px 24px;
+                        font-family: 'SF Mono', ui-monospace, monospace;
+                        font-size: 30px;
+                        font-weight: 700;
+                        letter-spacing: 5px;
+                        background: var(--color-bg-subtle);
+                        padding: 14px 24px;
                         border-radius: 8px;
                         border: 2px dashed var(--color-border-default);
-                        margin-bottom: 16px;
+                        margin-bottom: 10px;
                         user-select: all;
                         cursor: pointer;
+                        display: inline-block;
                     " title="Click to copy">${oauthFlow.userCode}</div>
-                    <p style="color: var(--color-fg-muted); font-size: 12px; margin-bottom: 16px;">
+                    <p style="color: var(--color-fg-muted); font-size: 12px; margin: 0 0 18px;">
                         Click the code to copy it
                     </p>
-                    <a href="${oauthFlow.verificationUri}" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                    <a href="${oauthFlow.verificationUri}" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px; text-decoration: none;">
                         ${this.getGitHubLogo()}
                         Open GitHub Device Activation
                     </a>
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--color-fg-muted);">
-                        <svg class="spinner" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--color-fg-muted); font-size: 12px;">
+                        <svg class="spinner" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M8 2a6 6 0 1 0 6 6" stroke-linecap="round"></path>
                         </svg>
                         <span>Waiting for authorization...</span>
                     </div>
                     ${this.state.error ? `<p class="error-text" style="margin-top: 12px;">${this.state.error}</p>` : ""}
                 </div>
-                <button class="btn btn-secondary oauth-cancel-btn" style="width: 100%; margin-top: 12px;">Cancel</button>
+                <button class="btn btn-secondary oauth-cancel-btn" style="width: 100%; margin-top: 8px;">Cancel</button>
             </div>
         `;
     }

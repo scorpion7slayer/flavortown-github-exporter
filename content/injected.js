@@ -1801,35 +1801,45 @@ function showAIDeclarationWarning(result) {
 
     const banner = document.createElement("div");
     banner.id = "ai-declaration-warning";
+    banner.setAttribute("role", "alert");
+    banner.setAttribute("aria-live", "polite");
     banner.style.cssText = `
         display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 10px 14px;
-        margin-bottom: 10px;
-        background: rgba(210,153,34,0.1);
-        border: 1px solid rgba(210,153,34,0.45);
-        border-radius: 8px;
-        font-size: 12px;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        margin-bottom: 14px;
+        background: linear-gradient(90deg, rgba(227,179,65,0.12), rgba(227,179,65,0.06));
+        border: 1px solid rgba(227,179,65,0.45);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        font-size: 13px;
         font-family: inherit;
-        color: #c9a227;
+        color: #c9d1d9;
     `;
 
     const warningBtn = _makeDeclarationBtn(true);
     _triggerDeclarationGeneration(warningBtn, declarationField);
 
     const textDiv = document.createElement("div");
-    textDiv.style.cssText = "flex:1;";
+    textDiv.style.cssText = "flex:1;min-width:0;";
     textDiv.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="#e3b341" style="flex-shrink:0;">
-                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-            </svg>
-            <strong style="color:#e3b341;">${pct}% AI-assisted commits detected</strong>
-        </div>
-        <div style="margin-top:4px;color:#b89120;line-height:1.4;">
-            ${tools} detected in commit history (${result.aiCommits}/${result.totalCommits} commits).
-            Projects that use AI may be <strong style="color:#e3b341;">rejected</strong> without an AI declaration.
+        <div style="display:flex;gap:12px;align-items:center;min-width:0;">
+            <div style="width:36px;height:36px;border-radius:999px;background:rgba(227,179,65,0.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#e3b341" style="display:block;">
+                    <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                </svg>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <strong style="font-size:13px;color:#e3b341;white-space:nowrap;">AI usage detected</strong>
+                    <span style="background:#e3b341;color:#0d1117;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;">${pct}%</span>
+                </div>
+                <div style="margin-top:6px;color:#b89120;line-height:1.4;overflow:hidden;text-overflow:ellipsis;">
+                    ${tools} detected in commit history (${result.aiCommits}/${result.totalCommits} commits).
+                    Projects that use AI may be <strong style="color:#e3b341;">rejected</strong> without an AI declaration.
+                </div>
+            </div>
         </div>
     `;
     textDiv.appendChild(warningBtn);

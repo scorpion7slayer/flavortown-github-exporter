@@ -65,7 +65,11 @@ const AI_PROVIDERS = {
         requiresApiKey: true,
         dynamicModels: false,
         fallbackModels: [
-            { id: "claude-haiku-4-5-20250219", name: "Claude Haiku 4.5", free: false },
+            {
+                id: "claude-haiku-4-5-20250219",
+                name: "Claude Haiku 4.5",
+                free: false,
+            },
         ],
     },
     openrouter: {
@@ -74,9 +78,21 @@ const AI_PROVIDERS = {
         requiresApiKey: true,
         dynamicModels: true,
         fallbackModels: [
-            { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B", free: true },
-            { id: "qwen/qwen2.5-14b-instruct", name: "Qwen 2.5 14B", free: true },
-            { id: "microsoft/phi-3-mini-128k-instruct", name: "Phi-3 Mini", free: true },
+            {
+                id: "meta-llama/llama-3.1-8b-instruct",
+                name: "Llama 3.1 8B",
+                free: true,
+            },
+            {
+                id: "qwen/qwen2.5-14b-instruct",
+                name: "Qwen 2.5 14B",
+                free: true,
+            },
+            {
+                id: "microsoft/phi-3-mini-128k-instruct",
+                name: "Phi-3 Mini",
+                free: true,
+            },
             { id: "google/gemma-2-9b-it", name: "Gemma 2 9B", free: true },
         ],
     },
@@ -104,6 +120,15 @@ const AI_PROVIDERS = {
 // ─── Changelog Data ─────────────────────────────────────────────────────────
 
 const CHANGELOG = [
+    {
+        version: "2.5.0",
+        changes: [
+            "Free only models for OpenRouter",
+            "Add button Generate with AI for AI Declaration",
+            "improvement of the style for certain places which makes the interface prettier and pleasant",
+            "free and inexpensive ai models kept only",
+        ],
+    },
     {
         version: "2.0.0",
         changes: [
@@ -137,6 +162,7 @@ const AIDescriptionService = {
                 GET_AI_SETTINGS: "AI_SETTINGS_RESULT",
                 SAVE_AI_SETTINGS: "AI_SETTINGS_SAVED",
                 AI_GENERATE_DESCRIPTION: "AI_DESCRIPTION_RESULT",
+                AI_GENERATE_DECLARATION: "AI_DECLARATION_RESULT",
                 AI_TEST_CONNECTION: "AI_TEST_RESULT",
                 AI_FETCH_MODELS: "AI_MODELS_RESULT",
             }[type];
@@ -173,6 +199,14 @@ const AIDescriptionService = {
         return this._request(
             "AI_GENERATE_DESCRIPTION",
             { repo, settings },
+            60000,
+        );
+    },
+
+    async generateDeclaration(projectTitle, projectDescription, settings) {
+        return this._request(
+            "AI_GENERATE_DECLARATION",
+            { projectTitle, projectDescription, settings },
             60000,
         );
     },
@@ -254,8 +288,12 @@ class AISettingsModal extends HTMLElement {
         }
         if (!this.settings.model && this.dynamicModels.length > 0) {
             if (this.settings.provider === "openrouter") {
-                const freeRouter = this.dynamicModels.find((m) => m.id === "openrouter/free");
-                this.settings.model = freeRouter ? freeRouter.id : this.dynamicModels[0].id;
+                const freeRouter = this.dynamicModels.find(
+                    (m) => m.id === "openrouter/free",
+                );
+                this.settings.model = freeRouter
+                    ? freeRouter.id
+                    : this.dynamicModels[0].id;
             } else {
                 this.settings.model = this.dynamicModels[0].id;
             }
@@ -277,12 +315,17 @@ class AISettingsModal extends HTMLElement {
                 Loading models...
             </div>`;
         } else {
-            let models = this.dynamicModels.length > 0 ? this.dynamicModels : providerDef.fallbackModels;
+            let models =
+                this.dynamicModels.length > 0
+                    ? this.dynamicModels
+                    : providerDef.fallbackModels;
             if (this.settings.freeOnly) models = models.filter((m) => m.free);
             const isOpenRouter = this.settings.provider === "openrouter";
 
             if (models.length > 0) {
-                const selectedModel = models.find((m) => m.id === this.settings.model) || models[0];
+                const selectedModel =
+                    models.find((m) => m.id === this.settings.model) ||
+                    models[0];
                 html += `<div class="model-dropdown">
                     <button type="button" class="model-dropdown-trigger${this._modelDropdownOpen ? " open" : ""}">
                         <span>${selectedModel.name}</span>
@@ -314,7 +357,9 @@ class AISettingsModal extends HTMLElement {
     }
 
     _updateModelSection() {
-        const container = this.shadowRoot.querySelector("#model-section-container");
+        const container = this.shadowRoot.querySelector(
+            "#model-section-container",
+        );
         if (!container) {
             this.render();
             this.addEventListeners();
@@ -639,139 +684,185 @@ class AISettingsModal extends HTMLElement {
         this._listenerAC = new AbortController();
         const { signal } = this._listenerAC;
 
-        this.shadowRoot.addEventListener("click", (e) => {
-            if (
-                e.target.closest(".close-btn") ||
-                e.target.classList.contains("overlay")
-            ) {
-                this.remove();
-            }
-            if (e.target.closest(".model-dropdown-trigger")) {
-                this._modelDropdownOpen = !this._modelDropdownOpen;
-                const trigger = this.shadowRoot.querySelector(".model-dropdown-trigger");
-                const list = this.shadowRoot.querySelector(".model-dropdown-list");
-                if (trigger) trigger.classList.toggle("open", this._modelDropdownOpen);
-                if (list) {
-                    list.classList.toggle("open", this._modelDropdownOpen);
-                    if (this._modelDropdownOpen && trigger) {
-                        const rect = trigger.getBoundingClientRect();
-                        list.style.top = `${rect.bottom + 2}px`;
-                        list.style.left = `${rect.left}px`;
-                        list.style.width = `${rect.width}px`;
-                        const selected = list.querySelector(".model-dropdown-item.selected");
-                        if (selected) selected.scrollIntoView({ block: "nearest" });
-                    }
+        this.shadowRoot.addEventListener(
+            "click",
+            (e) => {
+                if (
+                    e.target.closest(".close-btn") ||
+                    e.target.classList.contains("overlay")
+                ) {
+                    this.remove();
                 }
-                return;
-            }
-            const item = e.target.closest(".model-dropdown-item");
-            if (item) {
-                const newModel = item.dataset.value;
-                this._modelDropdownOpen = false;
-                if (newModel !== this.settings.model) {
-                    this.settings.model = newModel;
-                    this._updateModelSection();
-                } else {
-                    const trigger = this.shadowRoot.querySelector(".model-dropdown-trigger");
-                    const list = this.shadowRoot.querySelector(".model-dropdown-list");
+                if (e.target.closest(".model-dropdown-trigger")) {
+                    this._modelDropdownOpen = !this._modelDropdownOpen;
+                    const trigger = this.shadowRoot.querySelector(
+                        ".model-dropdown-trigger",
+                    );
+                    const list = this.shadowRoot.querySelector(
+                        ".model-dropdown-list",
+                    );
+                    if (trigger)
+                        trigger.classList.toggle(
+                            "open",
+                            this._modelDropdownOpen,
+                        );
+                    if (list) {
+                        list.classList.toggle("open", this._modelDropdownOpen);
+                        if (this._modelDropdownOpen && trigger) {
+                            const rect = trigger.getBoundingClientRect();
+                            list.style.top = `${rect.bottom + 2}px`;
+                            list.style.left = `${rect.left}px`;
+                            list.style.width = `${rect.width}px`;
+                            const selected = list.querySelector(
+                                ".model-dropdown-item.selected",
+                            );
+                            if (selected)
+                                selected.scrollIntoView({ block: "nearest" });
+                        }
+                    }
+                    return;
+                }
+                const item = e.target.closest(".model-dropdown-item");
+                if (item) {
+                    const newModel = item.dataset.value;
+                    this._modelDropdownOpen = false;
+                    if (newModel !== this.settings.model) {
+                        this.settings.model = newModel;
+                        this._updateModelSection();
+                    } else {
+                        const trigger = this.shadowRoot.querySelector(
+                            ".model-dropdown-trigger",
+                        );
+                        const list = this.shadowRoot.querySelector(
+                            ".model-dropdown-list",
+                        );
+                        if (trigger) trigger.classList.remove("open");
+                        if (list) list.classList.remove("open");
+                    }
+                    return;
+                }
+                // Fermer le dropdown si clic en dehors
+                if (
+                    this._modelDropdownOpen &&
+                    !e.target.closest(".model-dropdown")
+                ) {
+                    this._modelDropdownOpen = false;
+                    const trigger = this.shadowRoot.querySelector(
+                        ".model-dropdown-trigger",
+                    );
+                    const list = this.shadowRoot.querySelector(
+                        ".model-dropdown-list",
+                    );
                     if (trigger) trigger.classList.remove("open");
                     if (list) list.classList.remove("open");
                 }
-                return;
-            }
-            // Fermer le dropdown si clic en dehors
-            if (this._modelDropdownOpen && !e.target.closest(".model-dropdown")) {
-                this._modelDropdownOpen = false;
-                const trigger = this.shadowRoot.querySelector(".model-dropdown-trigger");
-                const list = this.shadowRoot.querySelector(".model-dropdown-list");
-                if (trigger) trigger.classList.remove("open");
-                if (list) list.classList.remove("open");
-            }
-            if (e.target.closest(".btn-refresh")) {
-                this.loadModels();
-            }
-            if (e.target.closest(".btn-free-only")) {
-                this.settings.freeOnly = !this.settings.freeOnly;
-                this._updateModelSection();
-            }
-            if (e.target.closest("#open-prompt-settings")) {
-                showPromptSettingsModal(this.settings, (updated) => {
-                    Object.assign(this.settings, updated);
+                if (e.target.closest(".btn-refresh")) {
+                    this.loadModels();
+                }
+                if (e.target.closest(".btn-free-only")) {
+                    this.settings.freeOnly = !this.settings.freeOnly;
+                    this._updateModelSection();
+                }
+                if (e.target.closest("#open-prompt-settings")) {
+                    showPromptSettingsModal(this.settings, (updated) => {
+                        Object.assign(this.settings, updated);
+                        this.render();
+                        this.addEventListeners();
+                    });
+                }
+            },
+            { signal },
+        );
+
+        this.shadowRoot.addEventListener(
+            "change",
+            (e) => {
+                if (e.target.id === "ai-provider-select") {
+                    this.settings.provider = e.target.value;
+                    this.settings.model = "";
+                    this.settings.apiKey = "";
+                    this.settings.freeOnly = false;
+                    this.testStatus = null;
+                    this.dynamicModels = [];
+                    this._modelDropdownOpen = false;
+                    const newProviderDef = AI_PROVIDERS[this.settings.provider];
+                    if (newProviderDef.dynamicModels) this.modelsLoading = true;
                     this.render();
                     this.addEventListeners();
-                });
-            }
-        }, { signal });
+                    this.loadModels(true);
+                }
+                if (e.target.id === "ai-model-select") {
+                    this.settings.model = e.target.value;
+                }
+                if (e.target.id === "ai-auto-generate") {
+                    this.settings.autoGenerate = e.target.checked;
+                }
+                if (e.target.id === "ai-prompt-preset") {
+                    this.settings.promptPreset = e.target.value;
+                    this.render();
+                    this.addEventListeners();
+                }
+            },
+            { signal },
+        );
 
-        this.shadowRoot.addEventListener("change", (e) => {
-            if (e.target.id === "ai-provider-select") {
-                this.settings.provider = e.target.value;
-                this.settings.model = "";
-                this.settings.apiKey = "";
-                this.settings.freeOnly = false;
-                this.testStatus = null;
-                this.dynamicModels = [];
-                this._modelDropdownOpen = false;
-                const newProviderDef = AI_PROVIDERS[this.settings.provider];
-                if (newProviderDef.dynamicModels) this.modelsLoading = true;
-                this.render();
-                this.addEventListeners();
-                this.loadModels(true);
-            }
-            if (e.target.id === "ai-model-select") {
-                this.settings.model = e.target.value;
-            }
-            if (e.target.id === "ai-auto-generate") {
-                this.settings.autoGenerate = e.target.checked;
-            }
-            if (e.target.id === "ai-prompt-preset") {
-                this.settings.promptPreset = e.target.value;
-                this.render();
-                this.addEventListeners();
-            }
-        }, { signal });
+        this.shadowRoot.addEventListener(
+            "input",
+            (e) => {
+                if (e.target.id === "ai-api-key") {
+                    this.settings.apiKey = e.target.value.trim();
+                }
+                if (e.target.id === "ai-ollama-url") {
+                    this.settings.ollamaUrl = e.target.value.trim();
+                }
+                if (e.target.id === "ai-custom-model") {
+                    this.settings.model = e.target.value.trim();
+                }
+                if (e.target.id === "ai-custom-prompt") {
+                    this.settings.customPrompt = e.target.value;
+                }
+            },
+            { signal },
+        );
 
-        this.shadowRoot.addEventListener("input", (e) => {
-            if (e.target.id === "ai-api-key") {
-                this.settings.apiKey = e.target.value.trim();
-            }
-            if (e.target.id === "ai-ollama-url") {
-                this.settings.ollamaUrl = e.target.value.trim();
-            }
-            if (e.target.id === "ai-custom-model") {
-                this.settings.model = e.target.value.trim();
-            }
-            if (e.target.id === "ai-custom-prompt") {
-                this.settings.customPrompt = e.target.value;
-            }
-        }, { signal });
-
-        this.shadowRoot.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") this.remove();
-        }, { signal });
+        this.shadowRoot.addEventListener(
+            "keydown",
+            (e) => {
+                if (e.key === "Escape") this.remove();
+            },
+            { signal },
+        );
 
         const testBtn = this.shadowRoot.querySelector(".btn-test");
         if (testBtn) {
-            testBtn.addEventListener("click", async () => {
-                testBtn.disabled = true;
-                testBtn.textContent = "Testing...";
-                this.testStatus = null;
-                const result = await AIDescriptionService.testConnection(
-                    this.settings,
-                );
-                this.testStatus = result;
-                this.render();
-                this.addEventListeners();
-            }, { signal });
+            testBtn.addEventListener(
+                "click",
+                async () => {
+                    testBtn.disabled = true;
+                    testBtn.textContent = "Testing...";
+                    this.testStatus = null;
+                    const result = await AIDescriptionService.testConnection(
+                        this.settings,
+                    );
+                    this.testStatus = result;
+                    this.render();
+                    this.addEventListeners();
+                },
+                { signal },
+            );
         }
 
         const saveBtn = this.shadowRoot.querySelector(".save-btn");
         if (saveBtn) {
-            saveBtn.addEventListener("click", async () => {
-                await AIDescriptionService.saveSettings(this.settings);
-                this.remove();
-                showGlobalNotification("AI settings saved!", "success");
-            }, { signal });
+            saveBtn.addEventListener(
+                "click",
+                async () => {
+                    await AIDescriptionService.saveSettings(this.settings);
+                    this.remove();
+                    showGlobalNotification("AI settings saved!", "success");
+                },
+                { signal },
+            );
         }
     }
 
@@ -1383,6 +1474,364 @@ function injectGenerateButton(repo) {
     });
 
     descField.parentNode.insertBefore(wrapper, descField.nextSibling);
+}
+
+// ─── AI Declaration Button (inline with label) ───────────────────────────────
+
+function _triggerDeclarationGeneration(btn, declarationField) {
+    btn.addEventListener("click", async () => {
+        const settings = await AIDescriptionService.getSettings();
+        if (!settings || !settings.provider) {
+            const modal = document.createElement("ai-settings-modal");
+            document.body.appendChild(modal);
+            return;
+        }
+
+        const projectTitle =
+            (document.querySelector("#project_title") || {}).value || "";
+        const projectDescription =
+            (document.querySelector("#project_description") || {}).value || "";
+
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="animation:spin 1s linear infinite;margin-right:4px;">
+                <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+                <path d="M8 2a6 6 0 1 0 6 6" stroke-linecap="round"></path>
+            </svg>
+            Generating...
+        `;
+
+        const savedAnim = startGeneratingAnimation(declarationField);
+
+        const result = await AIDescriptionService.generateDeclaration(
+            projectTitle,
+            projectDescription,
+            settings,
+        );
+
+        stopGeneratingAnimation(declarationField, savedAnim);
+
+        if (result.declaration) {
+            declarationField.value = result.declaration;
+            declarationField.dispatchEvent(
+                new Event("input", { bubbles: true }),
+            );
+            declarationField.dispatchEvent(
+                new Event("change", { bubbles: true }),
+            );
+            showGlobalNotification("AI declaration generated!", "success");
+        } else {
+            showGlobalNotification(
+                `AI error: ${result.error || "Unknown error"}`,
+                "error",
+            );
+        }
+
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.innerHTML = originalHTML;
+    });
+}
+
+function _makeDeclarationBtn(small = false) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.innerHTML = `
+        <svg width="${small ? 11 : 12}" height="${small ? 11 : 12}" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;opacity:0.9;">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+        </svg>
+        Generate with AI
+    `;
+    btn.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        padding: ${small ? "4px 9px" : "5px 10px"};
+        background: rgba(88,166,255,0.12);
+        color: #58a6ff;
+        border: 1px solid rgba(88,166,255,0.3);
+        border-radius: 5px;
+        font-family: inherit;
+        font-size: ${small ? "11px" : "11.5px"};
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    `;
+    btn.addEventListener("mouseenter", () => {
+        btn.style.background = "rgba(88,166,255,0.22)";
+        btn.style.borderColor = "rgba(88,166,255,0.6)";
+    });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.background = "rgba(88,166,255,0.12)";
+        btn.style.borderColor = "rgba(88,166,255,0.3)";
+    });
+    return btn;
+}
+
+function injectAIDeclarationButton() {
+    if (document.querySelector("#ai-declaration-label-row")) return;
+
+    const declarationField = document.querySelector("#project_ai_declaration");
+    if (!declarationField) return;
+
+    const inputContainer =
+        declarationField.closest(".input") || declarationField.parentNode;
+
+    // Use position:absolute so the button is unaffected by the container's
+    // flex/overflow layout and is guaranteed to be visible.
+    inputContainer.style.position = "relative";
+
+    const btn = document.createElement("button");
+    btn.id = "ai-declaration-label-row";
+    btn.type = "button";
+    btn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:5px;">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+        </svg>
+        Generate with AI
+    `;
+    btn.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 10px;
+        background: #24292f;
+        color: #ffffff;
+        border: 1px solid #484f58;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 11.5px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s;
+        white-space: nowrap;
+    `;
+    btn.addEventListener("mouseenter", () => {
+        btn.style.background = "#32383f";
+    });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.background = "#24292f";
+    });
+
+    _triggerDeclarationGeneration(btn, declarationField);
+    inputContainer.appendChild(btn);
+}
+
+// ─── AI Contribution Detection ───────────────────────────────────────────────
+
+const AI_BOT_LOGINS = [
+    "github-copilot[bot]",
+    "copilot-swe-agent[bot]",
+    "devin-ai-integration[bot]",
+    "cursor-nightly[bot]",
+    "coderabbitai[bot]",
+];
+
+const AI_COMMIT_PATTERNS = [
+    { re: /co-authored-by:[^\n]*copilot/i, tool: "GitHub Copilot" },
+    { re: /co-authored-by:[^\n]*claude/i, tool: "Claude" },
+    { re: /co-authored-by:[^\n]*anthropic/i, tool: "Claude" },
+    { re: /co-authored-by:[^\n]*cursor/i, tool: "Cursor" },
+    { re: /co-authored-by:[^\n]*devin/i, tool: "Devin AI" },
+    { re: /co-authored-by:[^\n]*chatgpt/i, tool: "ChatGPT" },
+    { re: /co-authored-by:[^\n]*gpt-/i, tool: "ChatGPT" },
+    { re: /generated (with|by|using) claude/i, tool: "Claude" },
+    { re: /generated (with|by|using) copilot/i, tool: "GitHub Copilot" },
+    { re: /generated (with|by|using) cursor/i, tool: "Cursor" },
+    { re: /generated (with|by|using) chatgpt/i, tool: "ChatGPT" },
+    { re: /🤖 generated with \[claude/i, tool: "Claude" },
+];
+
+// AI config files — presence alone is a strong signal of heavy AI usage
+const AI_CONFIG_FILES = [
+    { path: "CLAUDE.md", tool: "Claude" },
+    { path: ".claude/settings.json", tool: "Claude" },
+    { path: ".cursorrules", tool: "Cursor" },
+    { path: ".cursor/rules", tool: "Cursor" },
+    { path: ".github/copilot-instructions.md", tool: "GitHub Copilot" },
+    { path: ".copilot", tool: "GitHub Copilot" },
+    { path: ".aider.conf.yml", tool: "Aider" },
+    { path: "aider.conf.yml", tool: "Aider" },
+    { path: ".continuerc.json", tool: "Continue" },
+];
+
+const README_AI_PATTERNS = [
+    { re: /github copilot/i, tool: "GitHub Copilot" },
+    { re: /claude (code|ai)?/i, tool: "Claude" },
+    { re: /\bcursor\b.*(ai|editor|ide)/i, tool: "Cursor" },
+    { re: /chatgpt/i, tool: "ChatGPT" },
+    { re: /built (with|using) (ai|llm|copilot)/i, tool: "AI" },
+    { re: /generated (with|by|using) (an? )?ai/i, tool: "AI" },
+    { re: /ai(-|\s)?(assisted|generated|powered)/i, tool: "AI" },
+];
+
+async function _getGitHubToken() {
+    return new Promise((resolve) => {
+        const handler = (event) => {
+            if (event.data.type === "GITHUB_DATA_RESULT") {
+                window.removeEventListener("message", handler);
+                resolve(event.data.token || "");
+            }
+        };
+        window.addEventListener("message", handler);
+        window.postMessage({ type: "GET_GITHUB_DATA" }, "*");
+        setTimeout(() => {
+            window.removeEventListener("message", handler);
+            resolve("");
+        }, 5000);
+    });
+}
+
+async function checkAIContributions(repo) {
+    const githubToken = await _getGitHubToken();
+    const headers = {
+        Accept: "application/vnd.github.v3+json",
+        ...(githubToken ? { Authorization: `token ${githubToken}` } : {}),
+    };
+
+    const detectedTools = new Set();
+    let aiCommits = 0;
+    let totalCommits = 0;
+
+    try {
+        // 1. Check contributors list for known AI bots
+        const contribResp = await fetch(
+            `https://api.github.com/repos/${repo.full_name}/contributors?per_page=100`,
+            { headers },
+        );
+        if (contribResp.ok) {
+            const contributors = await contribResp.json();
+            if (Array.isArray(contributors)) {
+                for (const c of contributors) {
+                    const login = (c.login || "").toLowerCase();
+                    if (AI_BOT_LOGINS.some((b) => login === b.toLowerCase())) {
+                        if (login.includes("copilot"))
+                            detectedTools.add("GitHub Copilot");
+                        if (login.includes("devin"))
+                            detectedTools.add("Devin AI");
+                        if (login.includes("cursor"))
+                            detectedTools.add("Cursor");
+                        if (login.includes("claude"))
+                            detectedTools.add("Claude");
+                    }
+                }
+            }
+        }
+
+        // 2. Check recent commits for AI co-authorship patterns
+        const commitsResp = await fetch(
+            `https://api.github.com/repos/${repo.full_name}/commits?per_page=100`,
+            { headers },
+        );
+        if (commitsResp.ok) {
+            const commits = await commitsResp.json();
+            if (Array.isArray(commits) && commits.length > 0) {
+                totalCommits = commits.length;
+                for (const commit of commits) {
+                    const message = commit.commit?.message || "";
+                    const authorLogin = (
+                        commit.author?.login || ""
+                    ).toLowerCase();
+                    let isAI = false;
+
+                    if (
+                        AI_BOT_LOGINS.some(
+                            (b) => authorLogin === b.toLowerCase(),
+                        )
+                    ) {
+                        isAI = true;
+                        if (authorLogin.includes("copilot"))
+                            detectedTools.add("GitHub Copilot");
+                        if (authorLogin.includes("devin"))
+                            detectedTools.add("Devin AI");
+                        if (authorLogin.includes("cursor"))
+                            detectedTools.add("Cursor");
+                    }
+
+                    for (const { re, tool } of AI_COMMIT_PATTERNS) {
+                        if (re.test(message)) {
+                            isAI = true;
+                            detectedTools.add(tool);
+                        }
+                    }
+
+                    if (isAI) aiCommits++;
+                }
+            }
+        }
+    } catch (_) {}
+
+    if (totalCommits === 0) return null;
+    return {
+        percentage: aiCommits / totalCommits,
+        aiCommits,
+        totalCommits,
+        detectedTools: [...detectedTools],
+    };
+}
+
+function removeAIDeclarationWarning() {
+    document.querySelector("#ai-declaration-warning")?.remove();
+}
+
+function showAIDeclarationWarning(result) {
+    removeAIDeclarationWarning();
+    if (!result || (result.detectedTools.length === 0 && result.aiCommits === 0)) return;
+
+    const declarationField = document.querySelector("#project_ai_declaration");
+    if (!declarationField) return;
+
+    const inputContainer =
+        declarationField.closest(".input") || declarationField.parentNode;
+    const pct = Math.round(result.percentage * 100);
+    const tools =
+        result.detectedTools.length > 0
+            ? result.detectedTools.join(", ")
+            : "AI tools";
+
+    const banner = document.createElement("div");
+    banner.id = "ai-declaration-warning";
+    banner.style.cssText = `
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+        background: rgba(210,153,34,0.1);
+        border: 1px solid rgba(210,153,34,0.45);
+        border-radius: 8px;
+        font-size: 12px;
+        font-family: inherit;
+        color: #c9a227;
+    `;
+
+    const warningBtn = _makeDeclarationBtn(true);
+    _triggerDeclarationGeneration(warningBtn, declarationField);
+
+    const textDiv = document.createElement("div");
+    textDiv.style.cssText = "flex:1;";
+    textDiv.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#e3b341" style="flex-shrink:0;">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+            <strong style="color:#e3b341;">${pct}% AI-assisted commits detected</strong>
+        </div>
+        <div style="margin-top:4px;color:#b89120;line-height:1.4;">
+            ${tools} detected in commit history (${result.aiCommits}/${result.totalCommits} commits).
+            Projects that use AI may be <strong style="color:#e3b341;">rejected</strong> without an AI declaration.
+        </div>
+    `;
+    textDiv.appendChild(warningBtn);
+
+    banner.appendChild(textDiv);
+    inputContainer.parentNode.insertBefore(banner, inputContainer);
 }
 
 // ─── Auto-Generate Description ──────────────────────────────────────────────
@@ -2235,6 +2684,11 @@ class GitHubImportModal extends HTMLElement {
 
         // Auto-generate description if configured
         autoGenerateDescription(repo);
+
+        // Scan commits/contributors for AI usage and warn if any AI usage is detected
+        checkAIContributions(repo)
+            .then(showAIDeclarationWarning)
+            .catch(() => {});
 
         showGlobalNotification("Project imported!", "success");
 
@@ -3316,5 +3770,14 @@ if (document.readyState === "loading") {
 
 setTimeout(injectImportButton, 500);
 setTimeout(injectImportButton, 1500);
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", injectAIDeclarationButton);
+} else {
+    injectAIDeclarationButton();
+}
+
+setTimeout(injectAIDeclarationButton, 500);
+setTimeout(injectAIDeclarationButton, 1500);
 
 trackExtensionUsage();

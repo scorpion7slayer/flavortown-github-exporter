@@ -369,7 +369,8 @@ async function callProvider(settings, prompt, githubToken) {
 
 // Known Copilot models - only most common/active ones
 // Based on official GitHub Copilot docs: https://docs.github.com/copilot/reference/ai-models/supported-models
-// Free models: 0 multiplier on paid plans (GPT-4.1, GPT-4o, GPT-5 mini, Grok Code Fast 1)
+// Free models: 0 multiplier on paid plans (GPT-4.1, GPT-4o, GPT-5 mini only)
+// Grok Code Fast 1 is 0.25x, Claude Sonnet 4.6 is 1x
 const COPILOT_MODELS = [
     { id: "gpt-4.1", name: "GPT-4.1", free: true },
     { id: "gpt-4o", name: "GPT-4o", free: true },
@@ -377,10 +378,13 @@ const COPILOT_MODELS = [
     { id: "gpt-5", name: "GPT-5", free: false },
     { id: "gpt-5.1", name: "GPT-5.1", free: false },
     { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: false },
+    { id: "claude-sonnet-4", name: "Claude Sonnet 4", free: false },
     { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
+    { id: "claude-sonnet-4.6", name: "Claude Sonnet 4.6", free: false },
+    { id: "claude-opus-4.5", name: "Claude Opus 4.5", free: false },
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
     { id: "gemini-3-flash", name: "Gemini 3 Flash", free: false },
-    { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
+    { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: false },
 ];
 
 // Copilot API endpoints

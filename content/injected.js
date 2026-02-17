@@ -59,13 +59,27 @@ const AI_PROVIDERS = {
             { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
         ],
     },
-    ollama: {
-        name: "Ollama (Local)",
-        description: "Run AI locally - no API key needed",
+    anthropic: {
+        name: "Claude (Anthropic)",
+        description: "Requires Anthropic API key",
+        requiresApiKey: true,
+        dynamicModels: false,
+        fallbackModels: [
+            { id: "claude-haiku-4-5-20250219", name: "Claude Haiku 4.5", free: false },
+        ],
+    },
+    openrouter: {
+        name: "OpenRouter (Free)",
+        description: "Free models available - no API key needed",
         requiresApiKey: false,
-        hasUrlField: true,
         dynamicModels: true,
-        fallbackModels: [],
+        hasFreeOnlyToggle: true,
+        fallbackModels: [
+            { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B", free: true },
+            { id: "qwen/qwen2.5-14b-instruct", name: "Qwen 2.5 14B", free: true },
+            { id: "microsoft/phi-3-mini-128k-instruct", name: "Phi-3 Mini", free: true },
+            { id: "google/gemma-2-9b-it", name: "Gemma 2 9B", free: true },
+        ],
     },
     chatgpt: {
         name: "ChatGPT (OpenAI)",
@@ -74,49 +88,8 @@ const AI_PROVIDERS = {
         dynamicModels: true,
         fallbackModels: [
             { id: "gpt-5.2", name: "GPT-5.2", free: false },
-            { id: "gpt-5.2-pro", name: "GPT-5.2 Pro", free: false },
-            { id: "gpt-5.1", name: "GPT-5.1", free: false },
-            { id: "gpt-5", name: "GPT-5", free: false },
-            { id: "gpt-5-mini", name: "GPT-5 Mini", free: false },
-            { id: "gpt-5-nano", name: "GPT-5 Nano", free: false },
-            { id: "gpt-4.1", name: "GPT-4.1", free: false },
-        ],
-    },
-    claude: {
-        name: "Claude (Anthropic)",
-        description: "Requires Anthropic API key",
-        requiresApiKey: true,
-        dynamicModels: false,
-        fallbackModels: [
-            {
-                id: "claude-sonnet-4-5-20250929",
-                name: "Claude Sonnet 4.5",
-                free: false,
-            },
-            {
-                id: "claude-haiku-4-5-20251001",
-                name: "Claude Haiku 4.5",
-                free: false,
-            },
-        ],
-    },
-    openrouter: {
-        name: "OpenRouter",
-        description: "Free models available - requires API key",
-        requiresApiKey: true,
-        dynamicModels: true,
-        hasFreeOnlyToggle: true,
-        fallbackModels: [
-            {
-                id: "meta-llama/llama-3-8b-instruct:free",
-                name: "Llama 3 8B (Free)",
-                free: true,
-            },
-            {
-                id: "mistralai/mistral-7b-instruct:free",
-                name: "Mistral 7B (Free)",
-                free: true,
-            },
+            { id: "gpt-5.2-mini", name: "GPT-5.2 Mini", free: false },
+            { id: "gpt-5.2-large", name: "GPT-5.2 Large", free: false },
         ],
     },
 };

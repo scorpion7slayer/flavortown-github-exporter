@@ -36,12 +36,12 @@ window.addEventListener("message", async (event) => {
                     username: result.githubUsername || "",
                     token: result.githubToken || "",
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
                 { type: "GITHUB_DATA_RESULT", username: "", token: "" },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -66,7 +66,7 @@ window.addEventListener("message", async (event) => {
                     requestId: event.data.requestId,
                     settings: result.aiSettings || null,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -75,7 +75,7 @@ window.addEventListener("message", async (event) => {
                     requestId: event.data.requestId,
                     settings: null,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -89,7 +89,7 @@ window.addEventListener("message", async (event) => {
                     requestId: event.data.requestId,
                     success: true,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -98,7 +98,7 @@ window.addEventListener("message", async (event) => {
                     requestId: event.data.requestId,
                     success: false,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -121,7 +121,7 @@ window.addEventListener("message", async (event) => {
                     description: response.description,
                     error: response.error,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -131,7 +131,7 @@ window.addEventListener("message", async (event) => {
                     description: null,
                     error: e.message,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -153,7 +153,7 @@ window.addEventListener("message", async (event) => {
                     models: response.models,
                     error: response.error,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -163,7 +163,7 @@ window.addEventListener("message", async (event) => {
                     models: [],
                     error: e.message,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -186,7 +186,7 @@ window.addEventListener("message", async (event) => {
                     error: response.error,
                     message: response.message,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -196,7 +196,7 @@ window.addEventListener("message", async (event) => {
                     success: false,
                     error: e.message,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -220,7 +220,7 @@ window.addEventListener("message", async (event) => {
                     number: response.number,
                     error: response.error,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -230,7 +230,7 @@ window.addEventListener("message", async (event) => {
                     success: false,
                     error: e.message,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -253,7 +253,7 @@ window.addEventListener("message", async (event) => {
                     expiresIn: response.expiresIn,
                     error: response.error,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -262,7 +262,7 @@ window.addEventListener("message", async (event) => {
                     requestId: event.data.requestId,
                     error: e.message,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -284,7 +284,7 @@ window.addEventListener("message", async (event) => {
                     interval: response.interval,
                     error: response.error,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {
             window.postMessage(
@@ -293,7 +293,7 @@ window.addEventListener("message", async (event) => {
                     requestId: event.data.requestId,
                     error: e.message,
                 },
-                "*",
+                window.location.origin,
             );
         }
     }
@@ -306,7 +306,7 @@ window.addEventListener("message", async (event) => {
                     type: "OAUTH_CANCELLED",
                     requestId: event.data.requestId,
                 },
-                "*",
+                window.location.origin,
             );
         } catch (e) {}
     }

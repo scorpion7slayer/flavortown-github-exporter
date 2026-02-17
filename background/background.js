@@ -369,9 +369,10 @@ async function callProvider(settings, prompt, githubToken) {
 
 // Known Copilot models - only most common/active ones
 // Based on official GitHub Copilot docs: https://docs.github.com/copilot/reference/ai-models/supported-models
-// Free models: 0 multiplier on paid plans (GPT-4.1, GPT-5 mini only)
+// Free models: 0 multiplier on paid plans (GPT-4.1, GPT-4o, GPT-5 mini only)
 const COPILOT_MODELS = [
     { id: "gpt-4.1", name: "GPT-4.1", free: true },
+    { id: "gpt-4o", name: "GPT-4o", free: true },
     { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
     { id: "gpt-5", name: "GPT-5", free: false },
     { id: "gpt-5.1", name: "GPT-5.1", free: false },

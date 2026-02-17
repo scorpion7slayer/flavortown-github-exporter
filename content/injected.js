@@ -50,11 +50,12 @@ const AI_PROVIDERS = {
     copilot: {
         name: "GitHub Copilot",
         description:
-            "Uses OAuth authentication. Free: GPT-4.1, GPT-5 Mini.",
+            "Uses OAuth authentication. Free: GPT-4.1, GPT-4o, GPT-5 Mini.",
         requiresApiKey: false,
         dynamicModels: true,
         fallbackModels: [
             { id: "gpt-4.1", name: "GPT-4.1", free: true },
+            { id: "gpt-4o", name: "GPT-4o", free: true },
             { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
             { id: "gpt-5.1", name: "GPT-5.1", free: false },
             { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },

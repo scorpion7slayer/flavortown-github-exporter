@@ -5,6 +5,11 @@
 
 const FLAVORTOWN_PROJECT_ID = "7195";
 
+// OAuth App Client ID - User must create their own OAuth App on GitHub
+// Instructions: https://github.com/settings/developers → New OAuth App
+// Enable "Device Flow" in the app settings
+const GITHUB_OAUTH_CLIENT_ID = "Ov23lixxt1BuziBP0cw3";
+
 function trackExtensionUsage() {
     fetch("https://flavortown.hackclub.com/explore/extensions", {
         method: "GET",
@@ -49,9 +54,13 @@ const AI_PROVIDERS = {
         requiresApiKey: false,
         dynamicModels: true,
         fallbackModels: [
-            { id: "openai/gpt-4.1", name: "GPT-4.1 (Free)", free: true },
-            { id: "openai/gpt-5-mini", name: "GPT-5 Mini (Free)", free: true },
-            { id: "openai/gpt-5.2", name: "GPT-5.2", free: false },
+            { id: "gpt-4.1", name: "GPT-4.1", free: true },
+            { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
+            { id: "gpt-5.1", name: "GPT-5.1", free: false },
+            { id: "gpt-5.2", name: "GPT-5.2", free: false },
+            { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
+            { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: false },
+            { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
         ],
     },
     ollama: {
@@ -71,7 +80,9 @@ const AI_PROVIDERS = {
             { id: "gpt-5.2", name: "GPT-5.2", free: false },
             { id: "gpt-5.2-pro", name: "GPT-5.2 Pro", free: false },
             { id: "gpt-5.1", name: "GPT-5.1", free: false },
+            { id: "gpt-5", name: "GPT-5", free: false },
             { id: "gpt-5-mini", name: "GPT-5 Mini", free: false },
+            { id: "gpt-5-nano", name: "GPT-5 Nano", free: false },
             { id: "gpt-4.1", name: "GPT-4.1", free: false },
         ],
     },
@@ -82,12 +93,12 @@ const AI_PROVIDERS = {
         dynamicModels: false,
         fallbackModels: [
             {
-                id: "claude-sonnet-4-5-latest",
+                id: "claude-sonnet-4-5-20250929",
                 name: "Claude Sonnet 4.5",
                 free: false,
             },
             {
-                id: "claude-haiku-4-5-latest",
+                id: "claude-haiku-4-5-20251001",
                 name: "Claude Haiku 4.5",
                 free: false,
             },
@@ -244,8 +255,10 @@ class AISettingsModal extends HTMLElement {
         const providerDef = AI_PROVIDERS[this.settings.provider];
         if (!providerDef.dynamicModels) {
             this.dynamicModels = providerDef.fallbackModels;
-            this.render();
-            this.addEventListeners();
+            if (!skipLoadingRender) {
+                this.render();
+                this.addEventListeners();
+            }
             return;
         }
         this.modelsLoading = true;
@@ -266,6 +279,7 @@ class AISettingsModal extends HTMLElement {
         if (!this.settings.model && this.dynamicModels.length > 0) {
             this.settings.model = this.dynamicModels[0].id;
         }
+        // Ne re-render qu'une seule fois après le chargement
         this.render();
         this.addEventListeners();
     }
@@ -1404,7 +1418,10 @@ class GitHubImportModal extends HTMLElement {
             selectedRepo: null,
             isLoading: false,
             error: null,
+            // OAuth Device Flow state
+            oauthFlow: null, // { userCode, verificationUri, expiresIn, polling }
         };
+        this._oauthPollInterval = null;
     }
 
     async connectedCallback() {
@@ -1860,7 +1877,31 @@ class GitHubImportModal extends HTMLElement {
                 target.closest(".cancel-btn") ||
                 target.classList.contains("overlay")
             ) {
+                this.cancelOAuthFlow();
                 this.remove();
+            }
+
+            // OAuth Login Button
+            if (target.closest(".oauth-login-btn")) {
+                await this.startOAuthFlow();
+            }
+
+            // OAuth Cancel Button
+            if (target.closest(".oauth-cancel-btn")) {
+                this.cancelOAuthFlow();
+                this.state.oauthFlow = null;
+                this.state.error = null;
+                this.render();
+                this.addEventListeners();
+            }
+
+            // Copy OAuth code on click
+            if (target.closest(".oauth-code")) {
+                const code = this.state.oauthFlow?.userCode;
+                if (code) {
+                    navigator.clipboard.writeText(code);
+                    showGlobalNotification("Code copied!", "success");
+                }
             }
 
             if (target.closest(".save-username-btn")) {
@@ -1913,9 +1954,168 @@ class GitHubImportModal extends HTMLElement {
                 this.shadowRoot.querySelector(".save-username-btn")?.click();
             }
             if (e.key === "Escape") {
+                this.cancelOAuthFlow();
                 this.remove();
             }
         });
+    }
+
+    // OAuth Device Flow Methods
+    async startOAuthFlow() {
+        if (!GITHUB_OAUTH_CLIENT_ID) {
+            this.state.error = "OAuth Client ID not configured";
+            this.render();
+            return;
+        }
+
+        this.state.isLoading = true;
+        this.state.error = null;
+        this.render();
+
+        const requestId = Date.now().toString();
+
+        return new Promise((resolve) => {
+            const handler = (event) => {
+                if (
+                    event.data.type === "OAUTH_DEVICE_CODE_RESULT" &&
+                    event.data.requestId === requestId
+                ) {
+                    window.removeEventListener("message", handler);
+                    this.state.isLoading = false;
+
+                    if (event.data.error) {
+                        this.state.error = event.data.error;
+                        this.render();
+                        this.addEventListeners();
+                        resolve();
+                        return;
+                    }
+
+                    this.state.oauthFlow = {
+                        userCode: event.data.userCode,
+                        verificationUri: event.data.verificationUri,
+                        expiresIn: event.data.expiresIn,
+                    };
+                    this.render();
+                    this.addEventListeners();
+
+                    // Start polling for token
+                    this.pollOAuthToken();
+                    resolve();
+                }
+            };
+            window.addEventListener("message", handler);
+            window.postMessage(
+                {
+                    type: "OAUTH_START_DEVICE_FLOW",
+                    requestId,
+                    clientId: GITHUB_OAUTH_CLIENT_ID,
+                    scopes: "public_repo read:user",
+                },
+                "*",
+            );
+
+            setTimeout(() => {
+                window.removeEventListener("message", handler);
+                if (this.state.isLoading) {
+                    this.state.isLoading = false;
+                    this.state.error = "Timeout starting OAuth flow";
+                    this.render();
+                    this.addEventListeners();
+                }
+                resolve();
+            }, 30000);
+        });
+    }
+
+    pollOAuthToken() {
+        if (this._oauthPollInterval) {
+            clearInterval(this._oauthPollInterval);
+        }
+
+        let pollInterval = 5000; // Start with 5 seconds
+
+        const poll = async () => {
+            if (!this.state.oauthFlow) {
+                clearInterval(this._oauthPollInterval);
+                return;
+            }
+
+            const requestId = Date.now().toString();
+
+            const handler = (event) => {
+                if (
+                    event.data.type === "OAUTH_TOKEN_RESULT" &&
+                    event.data.requestId === requestId
+                ) {
+                    window.removeEventListener("message", handler);
+
+                    if (event.data.error) {
+                        this.state.error = event.data.error;
+                        this.state.oauthFlow = null;
+                        clearInterval(this._oauthPollInterval);
+                        this.render();
+                        this.addEventListeners();
+                        return;
+                    }
+
+                    if (event.data.pending) {
+                        // Still waiting, update interval if needed
+                        if (event.data.interval) {
+                            pollInterval = event.data.interval * 1000;
+                        }
+                        return;
+                    }
+
+                    // Success! Got the token
+                    if (event.data.accessToken) {
+                        clearInterval(this._oauthPollInterval);
+                        this.state.oauthFlow = null;
+                        this.state.token = event.data.accessToken;
+                        this.saveData("", event.data.accessToken);
+                        showGlobalNotification(
+                            "Connected to GitHub!",
+                            "success",
+                        );
+                        this.fetchRepositories();
+                    }
+                }
+            };
+            window.addEventListener("message", handler);
+            window.postMessage(
+                {
+                    type: "OAUTH_POLL_TOKEN",
+                    requestId,
+                    clientId: GITHUB_OAUTH_CLIENT_ID,
+                },
+                "*",
+            );
+
+            // Timeout for this poll request
+            setTimeout(() => {
+                window.removeEventListener("message", handler);
+            }, pollInterval);
+        };
+
+        // Initial poll
+        setTimeout(poll, pollInterval);
+
+        // Continue polling
+        this._oauthPollInterval = setInterval(poll, pollInterval);
+    }
+
+    cancelOAuthFlow() {
+        if (this._oauthPollInterval) {
+            clearInterval(this._oauthPollInterval);
+            this._oauthPollInterval = null;
+        }
+        if (this.state.oauthFlow) {
+            window.postMessage(
+                { type: "OAUTH_CANCEL", requestId: Date.now().toString() },
+                "*",
+            );
+            this.state.oauthFlow = null;
+        }
     }
 
     fillForm(repo) {
@@ -2014,21 +2214,50 @@ class GitHubImportModal extends HTMLElement {
     }
 
     renderSetup() {
+        // If OAuth Device Flow is active, show the code entry UI
+        if (this.state.oauthFlow) {
+            return this.renderOAuthDeviceFlow();
+        }
+
         const classicTokenUrl =
             "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=public_repo";
         const copilotTokenUrl =
             "https://github.com/settings/tokens/new?description=Flavortown%20GitHub%20Exporter&scopes=copilot,public_repo";
+
+        const hasOAuthClientId =
+            GITHUB_OAUTH_CLIENT_ID && GITHUB_OAUTH_CLIENT_ID.length > 0;
+
         return `
             <div class="setup-view">
+                ${
+                    hasOAuthClientId
+                        ? `
+                <div style="margin-bottom: 16px;">
+                    <button class="btn btn-primary oauth-login-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        ${this.getGitHubLogo()}
+                        Sign in with GitHub
+                    </button>
+                    <p class="helper-text" style="text-align: center; margin-top: 8px;">
+                        Recommended - Secure OAuth authentication
+                    </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid var(--color-border-default);">
+                    <span style="color: var(--color-fg-muted); font-size: 12px;">OR</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid var(--color-border-default);">
+                </div>
+                `
+                        : ""
+                }
                 <div class="form-group">
-                    <label for="gh-token-input">GitHub Token</label>
+                    <label for="gh-token-input">GitHub Token (Personal Access Token)</label>
                     <input
                         type="password"
                         id="gh-token-input"
                         placeholder="ghp_xxxxxxxxxxxx"
                         value="${this.state.token}"
                         autocomplete="off"
-                        autofocus
+                        ${hasOAuthClientId ? "" : "autofocus"}
                     >
                     <p class="helper-text">
                         <a href="${classicTokenUrl}" target="_blank" style="color: var(--color-accent-fg);">Create a classic token</a> (repos only)
@@ -2042,6 +2271,48 @@ class GitHubImportModal extends HTMLElement {
                 </div>
                 ${this.state.error ? `<p class="error-text">${this.state.error}</p>` : ""}
                 <button class="btn btn-primary save-username-btn" style="width: 100%; margin-top: 12px;">Load Repositories</button>
+            </div>
+        `;
+    }
+
+    renderOAuthDeviceFlow() {
+        const { oauthFlow } = this.state;
+        return `
+            <div class="setup-view oauth-device-flow">
+                <div style="text-align: center; padding: 20px 0;">
+                    <h3 style="margin: 0 0 16px 0; color: var(--color-fg-default);">Connect to GitHub</h3>
+                    <p style="color: var(--color-fg-muted); margin-bottom: 20px;">
+                        Enter this code on GitHub to authorize the extension:
+                    </p>
+                    <div class="oauth-code" style="
+                        font-family: monospace;
+                        font-size: 32px;
+                        font-weight: bold;
+                        letter-spacing: 4px;
+                        background: var(--color-canvas-subtle);
+                        padding: 16px 24px;
+                        border-radius: 8px;
+                        border: 2px dashed var(--color-border-default);
+                        margin-bottom: 16px;
+                        user-select: all;
+                        cursor: pointer;
+                    " title="Click to copy">${oauthFlow.userCode}</div>
+                    <p style="color: var(--color-fg-muted); font-size: 12px; margin-bottom: 16px;">
+                        Click the code to copy it
+                    </p>
+                    <a href="${oauthFlow.verificationUri}" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        ${this.getGitHubLogo()}
+                        Open GitHub Device Activation
+                    </a>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--color-fg-muted);">
+                        <svg class="spinner" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M8 2a6 6 0 1 0 6 6" stroke-linecap="round"></path>
+                        </svg>
+                        <span>Waiting for authorization...</span>
+                    </div>
+                    ${this.state.error ? `<p class="error-text" style="margin-top: 12px;">${this.state.error}</p>` : ""}
+                </div>
+                <button class="btn btn-secondary oauth-cancel-btn" style="width: 100%; margin-top: 12px;">Cancel</button>
             </div>
         `;
     }
@@ -2910,6 +3181,9 @@ function showReportIssueModal() {
                 const labels = template.ghLabel
                     ? [template.ghLabel]
                     : [...S.selectedLabels];
+
+                // Générer le body de l'issue
+                const body = template.buildBody(vals, env);
 
                 const submitBtn = modal.querySelector("#issue-submit-btn");
                 submitBtn.disabled = true;

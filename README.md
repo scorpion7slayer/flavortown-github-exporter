@@ -21,10 +21,10 @@
 - 🔗 **One-Click Import** - Adds an "Import from GitHub" button directly to the Flavortown new project page
 - 📦 **Browse Your Repos** - Displays all your public GitHub repositories in an elegant modal interface
 - 🎯 **Auto-Fill Forms** - Automatically fills in project details including:
-  - Project name
-  - Repository URL
-  - Demo/homepage link
-  - README link
+    - Project name
+    - Repository URL
+    - Demo/homepage link
+    - README link
 - 🔒 **Secure** - Your GitHub token is stored locally in your browser and never sent to third parties
 - 🎨 **Beautiful UI** - Clean, GitHub-inspired interface with dark mode support
 - ⚡ **Fast & Lightweight** - Minimal performance impact, only active on Flavortown pages
@@ -50,26 +50,33 @@
 ## 🎯 How to Use
 
 ### 1. **Navigate to Flavortown**
+
 Go to [https://flavortown.hackclub.com/projects/new](https://flavortown.hackclub.com/projects/new)
 
 ### 2. **Click the Import Button**
+
 You'll see a new **"Import"** button next to the "Create a new Project" heading
 
 ### 3. **Set Up Your GitHub Token**
+
 On first use, you'll need to provide a GitHub Personal Access Token:
+
 - Click the **"Create a token"** link in the modal
 - GitHub will open with the correct settings pre-configured
 - Scroll down and click **"Generate token"** (no need to change any settings)
 - Copy the token and paste it into the extension
 
 ### 4. **Browse Your Repositories**
+
 The extension will load all your public repositories with:
+
 - Repository names
 - Programming languages (with color indicators)
 - Star counts
 - Descriptions
 
 ### 5. **Select and Import**
+
 - Click on any repository to select it
 - Press **"Import Project"**
 - The Flavortown form will be automatically filled with your project details
@@ -91,27 +98,29 @@ The extension will load all your public repositories with:
 Want to contribute or run the extension locally?
 
 ### Prerequisites
+
 - Node.js (optional, for development)
 - A Chromium-based browser or Firefox
 
 ### Local Installation
 
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/flavortown-github-exporter.git
-   cd flavortown-github-exporter
-   ```
+
+    ```bash
+    git clone https://github.com/yourusername/flavortown-github-exporter.git
+    cd flavortown-github-exporter
+    ```
 
 2. **Load in Chrome**
-   - Open `chrome://extensions/`
-   - Enable "Developer mode" (toggle in top right)
-   - Click "Load unpacked"
-   - Select the extension directory
+    - Open `chrome://extensions/`
+    - Enable "Developer mode" (toggle in top right)
+    - Click "Load unpacked"
+    - Select the extension directory
 
 3. **Load in Firefox**
-   - Open `about:debugging#/runtime/this-firefox`
-   - Click "Load Temporary Add-on"
-   - Select the `manifest.json` file
+    - Open `about:debugging#/runtime/this-firefox`
+    - Click "Load Temporary Add-on"
+    - Select the `manifest.json` file
 
 ---
 
@@ -129,12 +138,15 @@ Contributions are welcome! Feel free to:
 ## 📸 Screenshots
 
 ### Import Button on Flavortown
+
 The extension adds a convenient "Import" button next to the page heading.
 
 ### Repository Selection Modal
+
 Browse your GitHub repositories with an elegant, GitHub-inspired interface.
 
 ### Auto-Filled Project Form
+
 Project details are automatically populated, saving you time and effort.
 
 ---
@@ -152,6 +164,7 @@ Copyright (c) 2026 scorpion7slayer
 Built with ❤️ for the [Hack Club](https://hackclub.com/) community
 
 **Links:**
+
 - [Chrome Web Store](https://chromewebstore.google.com/detail/ohkkaaibkhikfeemhpfpdhbpopjngaia?utm_source=item-share-cb)
 - [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/addon/flavortown-github-exporter/)
 - [Flavortown](https://flavortown.hackclub.com/)

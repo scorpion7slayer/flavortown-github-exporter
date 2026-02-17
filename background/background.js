@@ -1,13 +1,18 @@
 /**
  * Flavortown GitHub Exporter - Background Service Worker
- * Handles AI API calls and dynamic model fetching
+ * Handles AI API calls, dynamic model fetching, and OAuth Device Flow
  */
+
+// OAuth Device Flow state
+let deviceFlowState = null;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "AI_GENERATE_DESCRIPTION") {
         handleAIGeneration(message)
             .then(sendResponse)
-            .catch((e) => sendResponse({ description: null, error: e.message }));
+            .catch((e) =>
+                sendResponse({ description: null, error: e.message }),
+            );
         return true;
     }
 
@@ -31,7 +36,118 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .catch((e) => sendResponse({ success: false, error: e.message }));
         return true;
     }
+
+    // OAuth Device Flow handlers
+    if (message.type === "OAUTH_START_DEVICE_FLOW") {
+        startDeviceFlow(message.clientId, message.scopes)
+            .then(sendResponse)
+            .catch((e) => sendResponse({ error: e.message }));
+        return true;
+    }
+
+    if (message.type === "OAUTH_POLL_TOKEN") {
+        pollForToken(message.clientId)
+            .then(sendResponse)
+            .catch((e) => sendResponse({ error: e.message }));
+        return true;
+    }
+
+    if (message.type === "OAUTH_CANCEL") {
+        deviceFlowState = null;
+        sendResponse({ cancelled: true });
+        return true;
+    }
 });
+
+// ─── OAuth Device Flow ──────────────────────────────────────────────────────
+
+async function startDeviceFlow(clientId, scopes = "public_repo read:user") {
+    const resp = await fetch("https://github.com/login/device/code", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({
+            client_id: clientId,
+            scope: scopes,
+        }),
+    });
+
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error_description || `GitHub error: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    deviceFlowState = {
+        deviceCode: data.device_code,
+        userCode: data.user_code,
+        verificationUri: data.verification_uri,
+        expiresIn: data.expires_in,
+        interval: data.interval || 5,
+        expiresAt: Date.now() + data.expires_in * 1000,
+    };
+
+    return {
+        userCode: data.user_code,
+        verificationUri: data.verification_uri,
+        expiresIn: data.expires_in,
+    };
+}
+
+async function pollForToken(clientId) {
+    if (!deviceFlowState) {
+        throw new Error("No active device flow. Please start again.");
+    }
+
+    if (Date.now() > deviceFlowState.expiresAt) {
+        deviceFlowState = null;
+        throw new Error("Device code expired. Please start again.");
+    }
+
+    const resp = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({
+            client_id: clientId,
+            device_code: deviceFlowState.deviceCode,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        }),
+    });
+
+    const data = await resp.json();
+
+    if (data.error) {
+        if (data.error === "authorization_pending") {
+            return { pending: true, interval: deviceFlowState.interval };
+        }
+        if (data.error === "slow_down") {
+            deviceFlowState.interval = (deviceFlowState.interval || 5) + 5;
+            return { pending: true, interval: deviceFlowState.interval };
+        }
+        if (data.error === "expired_token") {
+            deviceFlowState = null;
+            throw new Error("Device code expired. Please start again.");
+        }
+        if (data.error === "access_denied") {
+            deviceFlowState = null;
+            throw new Error("Authorization was denied by the user.");
+        }
+        throw new Error(data.error_description || data.error);
+    }
+
+    // Success! We got the token
+    deviceFlowState = null;
+    return {
+        accessToken: data.access_token,
+        tokenType: data.token_type,
+        scope: data.scope,
+    };
+}
 
 // ─── Description Generation ─────────────────────────────────────────────────
 
@@ -46,7 +162,12 @@ async function handleAIGeneration({ repo, settings, githubToken }) {
         }
     } catch (_) {}
 
-    const prompt = buildPrompt(repo, readmeContent, settings.promptPreset, settings.customPrompt);
+    const prompt = buildPrompt(
+        repo,
+        readmeContent,
+        settings.promptPreset,
+        settings.customPrompt,
+    );
     const description = await callProvider(settings, prompt, githubToken);
     return { description, error: null };
 }
@@ -83,9 +204,9 @@ async function callProvider(settings, prompt, githubToken) {
                         Authorization: `Bearer ${githubToken}`,
                     },
                     body: JSON.stringify({
-                        model: model || "openai/gpt-4.1",
+                        model: model || "gpt-5-mini",
                         messages: [{ role: "user", content: prompt }],
-                        max_tokens: 500,
+                        max_completion_tokens: 500,
                         temperature: 0.7,
                     }),
                 },
@@ -103,7 +224,10 @@ async function callProvider(settings, prompt, githubToken) {
 
         case "ollama": {
             // Native Ollama /api/chat endpoint (see docs.ollama.com/api/chat)
-            const baseUrl = (ollamaUrl || "http://localhost:11434").replace(/\/+$/, "");
+            const baseUrl = (ollamaUrl || "http://localhost:11434").replace(
+                /\/+$/,
+                "",
+            );
             let resp;
             try {
                 resp = await fetch(`${baseUrl}/api/chat`, {
@@ -144,9 +268,9 @@ async function callProvider(settings, prompt, githubToken) {
                         Authorization: `Bearer ${apiKey}`,
                     },
                     body: JSON.stringify({
-                        model: model || "gpt-5.2",
+                        model: model || "gpt-5-mini",
                         messages: [{ role: "user", content: prompt }],
-                        max_tokens: 500,
+                        max_completion_tokens: 500,
                         temperature: 0.7,
                     }),
                 },
@@ -162,22 +286,19 @@ async function callProvider(settings, prompt, githubToken) {
         }
 
         case "claude": {
-            const resp = await fetch(
-                "https://api.anthropic.com/v1/messages",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-api-key": apiKey,
-                        "anthropic-version": "2023-06-01",
-                    },
-                    body: JSON.stringify({
-                        model: model || "claude-sonnet-4-5-latest",
-                        max_tokens: 500,
-                        messages: [{ role: "user", content: prompt }],
-                    }),
+            const resp = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": apiKey,
+                    "anthropic-version": "2023-06-01",
                 },
-            );
+                body: JSON.stringify({
+                    model: model || "claude-sonnet-4-5-20250929",
+                    max_tokens: 500,
+                    messages: [{ role: "user", content: prompt }],
+                }),
+            });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error(
@@ -200,11 +321,9 @@ async function callProvider(settings, prompt, githubToken) {
                         "X-Title": "Flavortown GitHub Exporter",
                     },
                     body: JSON.stringify({
-                        model:
-                            model ||
-                            "meta-llama/llama-3-8b-instruct:free",
+                        model: model || "meta-llama/llama-3-8b-instruct:free",
                         messages: [{ role: "user", content: prompt }],
-                        max_tokens: 500,
+                        max_completion_tokens: 500,
                         temperature: 0.7,
                     }),
                 },
@@ -232,22 +351,26 @@ async function fetchModels(settings, githubToken) {
     switch (provider) {
         case "copilot": {
             // Known free models (0 premium request multiplier for Pro/Pro+)
+            // Known free models for GitHub Copilot (2026)
             const FREE_COPILOT_MODELS = new Set([
-                "openai/gpt-4.1",
-                "openai/gpt-4.1-mini",
-                "openai/gpt-4.1-nano",
-                "openai/gpt-5-mini",
+                "gpt-4.1",
+                "gpt-5-mini",
+                "claude-haiku-4.5",
+                "gemini-3-flash",
+                "raptor-mini",
             ]);
             const FALLBACK_MODELS = [
-                { id: "openai/gpt-4.1", name: "GPT-4.1 (Free)", free: true },
-                { id: "openai/gpt-5-mini", name: "GPT-5 Mini (Free)", free: true },
-                { id: "openai/gpt-5.2", name: "GPT-5.2", free: false },
-                { id: "openai/gpt-5.2-codex", name: "GPT-5.2 Codex", free: false },
-                { id: "openai/gpt-5.1", name: "GPT-5.1", free: false },
-                { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
-                { id: "anthropic/claude-haiku-4.5", name: "Claude Haiku 4.5", free: false },
-                { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
-                { id: "google/gemini-3-flash", name: "Gemini 3 Flash", free: false },
+                { id: "gpt-4.1", name: "GPT-4.1", free: true },
+                { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
+                { id: "gpt-5.1", name: "GPT-5.1", free: false },
+                { id: "gpt-5.2", name: "GPT-5.2", free: false },
+                { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: true },
+                { id: "claude-sonnet-4", name: "Claude Sonnet 4", free: false },
+                { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
+                { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
+                { id: "gemini-3-flash", name: "Gemini 3 Flash", free: true },
+                { id: "gemini-3-pro", name: "Gemini 3 Pro", free: false },
+                { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
             ];
 
             if (!githubToken) {
@@ -288,7 +411,10 @@ async function fetchModels(settings, githubToken) {
         }
 
         case "ollama": {
-            const baseUrl = (ollamaUrl || "http://localhost:11434").replace(/\/+$/, "");
+            const baseUrl = (ollamaUrl || "http://localhost:11434").replace(
+                /\/+$/,
+                "",
+            );
             let resp;
             try {
                 resp = await fetch(`${baseUrl}/api/tags`);
@@ -303,12 +429,12 @@ async function fetchModels(settings, githubToken) {
                 );
             }
             if (!resp.ok)
-                throw new Error(`Ollama: ${resp.status}. Is Ollama running on ${baseUrl}?`);
+                throw new Error(
+                    `Ollama: ${resp.status}. Is Ollama running on ${baseUrl}?`,
+                );
             const data = await resp.json();
             const models = (data.models || [])
-                .filter(
-                    (m) => !m.name.toLowerCase().includes("embed"),
-                )
+                .filter((m) => !m.name.toLowerCase().includes("embed"))
                 .map((m) => ({
                     id: m.name,
                     name: m.name,
@@ -328,8 +454,7 @@ async function fetchModels(settings, githubToken) {
             const resp = await fetch("https://api.openai.com/v1/models", {
                 headers: { Authorization: `Bearer ${apiKey}` },
             });
-            if (!resp.ok)
-                throw new Error(`OpenAI error: ${resp.status}`);
+            if (!resp.ok) throw new Error(`OpenAI error: ${resp.status}`);
             const data = await resp.json();
             const excluded =
                 /embed|dall|tts|whisper|realtime|audio|image|babbage|davinci|canary|search/i;
@@ -344,12 +469,10 @@ async function fetchModels(settings, githubToken) {
         case "openrouter": {
             const headers = { "Content-Type": "application/json" };
             if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-            const resp = await fetch(
-                "https://openrouter.ai/api/v1/models",
-                { headers },
-            );
-            if (!resp.ok)
-                throw new Error(`OpenRouter error: ${resp.status}`);
+            const resp = await fetch("https://openrouter.ai/api/v1/models", {
+                headers,
+            });
+            if (!resp.ok) throw new Error(`OpenRouter error: ${resp.status}`);
             const data = await resp.json();
             const models = data.data
                 .filter((m) => m.id && m.name)
@@ -390,7 +513,9 @@ async function testConnection(settings, githubToken) {
 
 async function createGitHubIssue(githubToken, issue) {
     if (!githubToken) {
-        throw new Error("GitHub token required to create issues. Configure it in the extension settings.");
+        throw new Error(
+            "GitHub token required to create issues. Configure it in the extension settings.",
+        );
     }
 
     const resp = await fetch(
@@ -412,9 +537,7 @@ async function createGitHubIssue(githubToken, issue) {
 
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(
-            err.message || `GitHub API error: ${resp.status}`,
-        );
+        throw new Error(err.message || `GitHub API error: ${resp.status}`);
     }
 
     const data = await resp.json();

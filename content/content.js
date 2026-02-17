@@ -234,4 +234,80 @@ window.addEventListener("message", async (event) => {
             );
         }
     }
+
+    // --- OAuth Device Flow (routed through background service worker) ---
+
+    if (event.data.type === "OAUTH_START_DEVICE_FLOW") {
+        try {
+            const response = await runtime.sendMessage({
+                type: "OAUTH_START_DEVICE_FLOW",
+                clientId: event.data.clientId,
+                scopes: event.data.scopes,
+            });
+            window.postMessage(
+                {
+                    type: "OAUTH_DEVICE_CODE_RESULT",
+                    requestId: event.data.requestId,
+                    userCode: response.userCode,
+                    verificationUri: response.verificationUri,
+                    expiresIn: response.expiresIn,
+                    error: response.error,
+                },
+                "*",
+            );
+        } catch (e) {
+            window.postMessage(
+                {
+                    type: "OAUTH_DEVICE_CODE_RESULT",
+                    requestId: event.data.requestId,
+                    error: e.message,
+                },
+                "*",
+            );
+        }
+    }
+
+    if (event.data.type === "OAUTH_POLL_TOKEN") {
+        try {
+            const response = await runtime.sendMessage({
+                type: "OAUTH_POLL_TOKEN",
+                clientId: event.data.clientId,
+            });
+            window.postMessage(
+                {
+                    type: "OAUTH_TOKEN_RESULT",
+                    requestId: event.data.requestId,
+                    accessToken: response.accessToken,
+                    tokenType: response.tokenType,
+                    scope: response.scope,
+                    pending: response.pending,
+                    interval: response.interval,
+                    error: response.error,
+                },
+                "*",
+            );
+        } catch (e) {
+            window.postMessage(
+                {
+                    type: "OAUTH_TOKEN_RESULT",
+                    requestId: event.data.requestId,
+                    error: e.message,
+                },
+                "*",
+            );
+        }
+    }
+
+    if (event.data.type === "OAUTH_CANCEL") {
+        try {
+            await runtime.sendMessage({ type: "OAUTH_CANCEL" });
+            window.postMessage(
+                {
+                    type: "OAUTH_CANCELLED",
+                    requestId: event.data.requestId,
+                },
+                "*",
+            );
+        } catch (e) {}
+    }
 });

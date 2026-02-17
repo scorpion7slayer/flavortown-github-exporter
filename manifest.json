@@ -30,6 +30,7 @@
     "description": "Import your GitHub projects to Flavortown with one click and auto-generate descriptions with AI",
     "host_permissions": [
         "https://api.github.com/*",
+        "https://github.com/*",
         "https://flavortown.hackclub.com/*",
         "https://raw.githubusercontent.com/*",
         "https://models.github.ai/*",

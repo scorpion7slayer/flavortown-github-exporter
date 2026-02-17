@@ -136,6 +136,40 @@ window.addEventListener("message", async (event) => {
         }
     }
 
+    // --- AI Declaration Generation (routed through background service worker) ---
+
+    if (event.data.type === "AI_GENERATE_DECLARATION") {
+        try {
+            const stored = await storage.local.get(["githubToken"]);
+            const response = await runtime.sendMessage({
+                type: "AI_GENERATE_DECLARATION",
+                projectTitle: event.data.projectTitle,
+                projectDescription: event.data.projectDescription,
+                settings: event.data.settings,
+                githubToken: stored.githubToken || "",
+            });
+            window.postMessage(
+                {
+                    type: "AI_DECLARATION_RESULT",
+                    requestId: event.data.requestId,
+                    declaration: response.declaration,
+                    error: response.error,
+                },
+                window.location.origin,
+            );
+        } catch (e) {
+            window.postMessage(
+                {
+                    type: "AI_DECLARATION_RESULT",
+                    requestId: event.data.requestId,
+                    declaration: null,
+                    error: e.message,
+                },
+                window.location.origin,
+            );
+        }
+    }
+
     // --- AI Fetch Models (routed through background service worker) ---
 
     if (event.data.type === "AI_FETCH_MODELS") {

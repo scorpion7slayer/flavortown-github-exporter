@@ -1782,7 +1782,11 @@ function removeAIDeclarationWarning() {
 
 function showAIDeclarationWarning(result) {
     removeAIDeclarationWarning();
-    if (!result || (result.detectedTools.length === 0 && result.aiCommits === 0)) return;
+    if (
+        !result ||
+        (result.detectedTools.length === 0 && result.aiCommits === 0)
+    )
+        return;
 
     const declarationField = document.querySelector("#project_ai_declaration");
     if (!declarationField) return;

@@ -30,6 +30,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === "AI_GENERATE_DECLARATION") {
+        handleAIDeclarationGeneration(message)
+            .then(sendResponse)
+            .catch((e) =>
+                sendResponse({ declaration: null, error: e.message }),
+            );
+        return true;
+    }
+
     if (message.type === "CREATE_GITHUB_ISSUE") {
         createGitHubIssue(message.githubToken, message.issue)
             .then(sendResponse)
@@ -147,6 +156,27 @@ async function pollForToken(clientId) {
         tokenType: data.token_type,
         scope: data.scope,
     };
+}
+
+// ─── AI Declaration Generation ──────────────────────────────────────────────
+
+async function handleAIDeclarationGeneration({ projectTitle, projectDescription, settings, githubToken }) {
+    const prompt = buildDeclarationPrompt(projectTitle, projectDescription);
+    const declaration = await callProvider(settings, prompt, githubToken);
+    return { declaration, error: null };
+}
+
+function buildDeclarationPrompt(title, description) {
+    const context = [
+        title ? `Project: ${title}` : "",
+        description ? `Description: ${description}` : "",
+    ].filter(Boolean).join("\n");
+
+    return `Help a developer write an honest AI declaration for their project submission on Flavortown (a Hack Club program).
+
+${context || "No project info provided."}
+
+Write a concise AI declaration (2-4 sentences, max 300 chars) describing plausible ways AI tools were used during development of this project. Examples: code generation, debugging help, writing documentation, generating UI ideas, writing tests. Use first person ("I used..."). Be specific about the type of AI assistance. Do not invent usage that is clearly unrelated to the project type. English only. No markdown. Only output the declaration text.`;
 }
 
 // ─── Description Generation ─────────────────────────────────────────────────

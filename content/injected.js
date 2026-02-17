@@ -73,7 +73,6 @@ const AI_PROVIDERS = {
         description: "Requires API key - free models available",
         requiresApiKey: true,
         dynamicModels: true,
-        hasFreeOnlyToggle: true,
         fallbackModels: [
             { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B", free: true },
             { id: "qwen/qwen2.5-14b-instruct", name: "Qwen 2.5 14B", free: true },
@@ -91,6 +90,14 @@ const AI_PROVIDERS = {
             { id: "gpt-5.2-mini", name: "GPT-5.2 Mini", free: false },
             { id: "gpt-5.2-large", name: "GPT-5.2 Large", free: false },
         ],
+    },
+    ollama: {
+        name: "Ollama (Local)",
+        description: "Run AI locally - no API key needed",
+        requiresApiKey: false,
+        hasUrlField: true,
+        dynamicModels: true,
+        fallbackModels: [],
     },
 };
 
@@ -510,7 +517,7 @@ class AISettingsModal extends HTMLElement {
                 this.settings.freeOnly = false;
                 this.testStatus = null;
                 this.dynamicModels = [];
-                this.loadModels();
+                this.loadModels(true); // Skip loading render to avoid flicker
             }
             if (e.target.id === "ai-model-select") {
                 this.settings.model = e.target.value;

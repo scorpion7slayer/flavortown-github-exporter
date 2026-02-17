@@ -746,33 +746,16 @@ class AISettingsModal extends HTMLElement {
 
         // Dynamic model selector with loading state
         html += `<div class="form-group">`;
-        html += `<div style="display:flex;align-items:center;justify-content:space-between;">`;
-        html += `<label for="ai-model-select">Model</label>`;
-        html += `<div style="display:flex;gap:6px;">`;
-
-        // "Free only" toggle for OpenRouter
-        if (providerDef.hasFreeOnlyToggle) {
-            html += `
-                <button class="btn-free-only" style="
-                    padding:3px 8px;font-size:11px;border-radius:12px;cursor:pointer;border:1px solid;font-family:inherit;
-                    ${this.settings.freeOnly ? "background:rgba(46,160,67,0.15);border-color:rgba(46,160,67,0.4);color:#2ea043;" : "background:transparent;border-color:var(--color-border-default);color:var(--color-fg-muted);"}
-                ">Free only</button>
-            `;
-        }
-
-        // Refresh button
-        if (providerDef.dynamicModels) {
-            html += `
-                <button class="btn-refresh" style="
-                    padding:3px 8px;font-size:11px;border-radius:12px;cursor:pointer;
-                    background:transparent;border:1px solid var(--color-border-default);color:var(--color-fg-muted);font-family:inherit;
-                ">Refresh</button>
-            `;
-        }
-        html += `</div></div>`;
-
+        html += `<label for="ai-model-select" style="margin-bottom:8px;display:block;">Model</label>`;
+        
+        // Model selector with better styling
+        html += `<div style="display:flex;gap:8px;align-items:stretch;">`;
+        
         if (this.modelsLoading) {
-            html += `<div style="padding:8px 12px;color:var(--color-fg-muted);font-size:12px;">Loading models...</div>`;
+            html += `<div style="flex:1;padding:12px;background:var(--color-bg-subtle);border:1px solid var(--color-border-default);border-radius:6px;color:var(--color-fg-muted);font-size:13px;">
+                <span style="display:inline-block;width:16px;height:16px;border:2px solid var(--color-fg-muted);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-right:8px;vertical-align:middle;"></span>
+                Loading models...
+            </div>`;
         } else {
             let models =
                 this.dynamicModels.length > 0
@@ -786,22 +769,52 @@ class AISettingsModal extends HTMLElement {
 
             if (models.length > 0) {
                 html += `
-                    <select id="ai-model-select">
+                    <select id="ai-model-select" style="flex:1;padding:10px 12px;font-size:14px;border-radius:6px;border:1px solid var(--color-border-default);background:var(--color-canvas-default);color:var(--color-fg-default);cursor:pointer;">
                         ${models
                             .map((m) => {
-                                const badge = m.free ? " [Free]" : "";
-                                return `<option value="${m.id}" ${this.settings.model === m.id ? "selected" : ""}>${m.name}${badge}</option>`;
+                                return `<option value="${m.id}" ${this.settings.model === m.id ? "selected" : ""}>${m.name}${m.free ? " (Free)" : ""}</option>`;
                             })
                             .join("")}
                     </select>
                 `;
             } else {
-                html += `<div style="padding:8px 12px;color:var(--color-fg-muted);font-size:12px;">No models available${this.settings.freeOnly ? " (try disabling Free only)" : ""}</div>`;
+                html += `<div style="flex:1;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.4);border-radius:6px;color:var(--color-danger-fg);font-size:13px;">No models available${this.settings.freeOnly ? " (try disabling Free only)" : ""}</div>`;
             }
+        }
+        
+        // Action buttons
+        html += `<div style="display:flex;gap:6px;">`;
+
+        // "Free only" toggle for OpenRouter
+        if (providerDef.hasFreeOnlyToggle) {
+            html += `
+                <button class="btn-free-only" style="
+                    padding:8px 12px;font-size:12px;border-radius:6px;cursor:pointer;border:1px solid;font-family:inherit;white-space:nowrap;
+                    ${this.settings.freeOnly ? "background:rgba(46,160,67,0.2);border-color:#2ea043;color:#2ea043;font-weight:500;" : "background:var(--color-bg-subtle);border-color:var(--color-border-default);color:var(--color-fg-muted);"}
+                ">Free only</button>
+            `;
+        }
+
+        // Refresh button
+        if (providerDef.dynamicModels) {
+            html += `
+                <button class="btn-refresh" title="Refresh models" style="
+                    padding:8px 12px;font-size:12px;border-radius:6px;cursor:pointer;white-space:nowrap;
+                    background:var(--color-bg-subtle);border:1px solid var(--color-border-default);color:var(--color-fg-muted);font-family:inherit;
+                ">&#8635; Refresh</button>
+            `;
+        }
+        html += `</div></div>`;
+
+        // Model count info
+        if (!this.modelsLoading && (this.dynamicModels.length > 0 || providerDef.fallbackModels.length > 0)) {
+            const totalModels = providerDef.fallbackModels.length;
+            const freeModels = providerDef.fallbackModels.filter(m => m.free).length;
+            html += `<div style="margin-top:6px;font-size:11px;color:var(--color-fg-muted);">${totalModels} models available${freeModels > 0 ? ` (${freeModels} free)` : ""}</div>`;
         }
 
         if (this.modelsError) {
-            html += `<span class="helper-text" style="color:var(--color-danger-fg);">${this.modelsError}</span>`;
+            html += `<span class="helper-text" style="color:var(--color-danger-fg);margin-top:6px;display:block;">${this.modelsError}</span>`;
         }
         html += `</div>`;
 

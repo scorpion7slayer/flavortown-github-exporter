@@ -50,7 +50,7 @@ const AI_PROVIDERS = {
     copilot: {
         name: "GitHub Copilot",
         description:
-            "Uses OAuth authentication. Free: GPT-4.1, GPT-4o, GPT-5 Mini, Grok Code Fast 1.",
+            "Uses OAuth authentication. Free: GPT-4.1, GPT-4o, GPT-5 Mini.",
         requiresApiKey: false,
         dynamicModels: true,
         fallbackModels: [
@@ -58,11 +58,14 @@ const AI_PROVIDERS = {
             { id: "gpt-4o", name: "GPT-4o", free: true },
             { id: "gpt-5-mini", name: "GPT-5 Mini", free: true },
             { id: "gpt-5.1", name: "GPT-5.1", free: false },
+            { id: "claude-sonnet-4", name: "Claude Sonnet 4", free: false },
             { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", free: false },
+            { id: "claude-sonnet-4.6", name: "Claude Sonnet 4.6", free: false },
             { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", free: false },
+            { id: "claude-opus-4.5", name: "Claude Opus 4.5", free: false },
             { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", free: false },
             { id: "gemini-3-flash", name: "Gemini 3 Flash", free: false },
-            { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: true },
+            { id: "grok-code-fast-1", name: "Grok Code Fast 1", free: false },
         ],
     },
     ollama: {

@@ -39,7 +39,6 @@
 - ⚡ **Dynamic Model Loading** — model lists are fetched live for each provider
 - 🆓 **Free-Only Filter** — toggle to show only free models (OpenRouter)
 - 🔌 **Connection Test** — verify your AI settings before generating
-- 🔎 **Manual Repo Input** — paste an `owner/repo` string to trigger AI detection without browsing your repos
 
 ---
 

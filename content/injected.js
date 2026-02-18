@@ -1689,6 +1689,16 @@ async function _getGitHubToken() {
 }
 
 async function checkAIContributions(repo) {
+    // Accept either: (1) a string "owner/repo", (2) an object with full_name,
+    // or (3) an object with html_url — normalize to `fullName`.
+    let fullName = null;
+    if (typeof repo === "string") {
+        fullName = parseRepoFullName(repo) || repo;
+    } else if (repo && typeof repo === "object") {
+        fullName = repo.full_name || parseRepoFullName(repo.html_url) || null;
+    }
+    if (!fullName) return null;
+
     const githubToken = await _getGitHubToken();
     const headers = {
         Accept: "application/vnd.github.v3+json",
@@ -1702,7 +1712,7 @@ async function checkAIContributions(repo) {
     try {
         // 1. Check contributors list for known AI bots
         const contribResp = await fetch(
-            `https://api.github.com/repos/${repo.full_name}/contributors?per_page=100`,
+            `https://api.github.com/repos/${fullName}/contributors?per_page=100`,
             { headers },
         );
         if (contribResp.ok) {
@@ -1726,7 +1736,7 @@ async function checkAIContributions(repo) {
 
         // 2. Check recent commits for AI co-authorship patterns
         const commitsResp = await fetch(
-            `https://api.github.com/repos/${repo.full_name}/commits?per_page=100`,
+            `https://api.github.com/repos/${fullName}/commits?per_page=100`,
             { headers },
         );
         if (commitsResp.ok) {
@@ -1959,6 +1969,49 @@ function findRepoInput() {
 
 function findReadmeInput() {
     return findFormInput(/readme|raw\.githubusercontent/i);
+}
+
+// Parse a GitHub repo identifier from a URL or input value.
+// Returns "owner/repo" or null.
+function parseRepoFullName(input) {
+    if (!input || typeof input !== "string") return null;
+    const v = input.trim().replace(/\.git$/i, "").replace(/\/$/, "");
+    // Full name like owner/repo
+    const simpleMatch = v.match(/^([\w.-]+)\/([\w.-]+)$/);
+    if (simpleMatch) return `${simpleMatch[1]}/${simpleMatch[2]}`;
+    // HTTPS URL
+    const httpsMatch = v.match(/^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\/.*)?$/i);
+    if (httpsMatch) return `${httpsMatch[1]}/${httpsMatch[2]}`;
+    // SSH URL
+    const sshMatch = v.match(/^git@github\.com:([^\/]+)\/([^\/]+)(?:\.git)?$/i);
+    if (sshMatch) return `${sshMatch[1]}/${sshMatch[2]}`;
+    return null;
+}
+
+// Watch the page's repo input (when user pastes or types a GitHub URL)
+// and run AI-detection for that repo so the banner appears for manual imports.
+function attachRepoInputWatcher() {
+    try {
+        const repoInput = findRepoInput();
+        if (!repoInput || repoInput._ftRepoWatcher) return;
+        repoInput._ftRepoWatcher = true;
+
+        const runDetection = async () => {
+            const val = (repoInput.value || "").trim();
+            const full = parseRepoFullName(val);
+            if (!full) return;
+            // set lastImportedRepo so other UI (generate button) works
+            if (!lastImportedRepo || lastImportedRepo.full_name !== full) {
+                lastImportedRepo = { full_name: full, html_url: `https://github.com/${full}` };
+            }
+            const result = await checkAIContributions(full);
+            showAIDeclarationWarning(result);
+        };
+
+        repoInput.addEventListener("change", runDetection);
+        repoInput.addEventListener("blur", runDetection);
+        repoInput.addEventListener("paste", () => setTimeout(runDetection, 100));
+    } catch (_) {}
 }
 
 // ─── GitHub Import Modal (original + AI integration) ────────────────────────
@@ -3794,11 +3847,15 @@ setTimeout(injectImportButton, 1500);
 
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", injectAIDeclarationButton);
+    document.addEventListener("DOMContentLoaded", attachRepoInputWatcher);
 } else {
     injectAIDeclarationButton();
+    attachRepoInputWatcher();
 }
 
 setTimeout(injectAIDeclarationButton, 500);
 setTimeout(injectAIDeclarationButton, 1500);
+setTimeout(attachRepoInputWatcher, 500);
+setTimeout(attachRepoInputWatcher, 1500);
 
 trackExtensionUsage();

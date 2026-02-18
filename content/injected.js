@@ -44,6 +44,17 @@ const LANGUAGE_COLORS = {
     default: "#8b949e",
 };
 
+// ─── HTML Escaping Utility ───────────────────────────────────────────────────
+
+function escapeHtml(str) {
+    return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 // ─── AI Provider Definitions ────────────────────────────────────────────────
 
 const AI_PROVIDERS = {
@@ -128,6 +139,7 @@ const CHANGELOG = [
             "improvement of the style for certain places which makes the interface prettier and pleasant",
             "free and inexpensive ai models kept only",
             'AI use detector in the project to advise writing in "AI Declaration" or generating with AI',
+            "Security vulnerability fixes",
         ],
     },
     {
@@ -179,7 +191,10 @@ const AIDescriptionService = {
                 }
             };
             window.addEventListener("message", handler);
-            window.postMessage({ type, requestId, ...data }, "*");
+            window.postMessage(
+                { type, requestId, ...data },
+                window.location.origin,
+            );
             const timer = setTimeout(() => {
                 window.removeEventListener("message", handler);
                 resolve({ error: "Request timed out" });
@@ -329,11 +344,11 @@ class AISettingsModal extends HTMLElement {
                     models[0];
                 html += `<div class="model-dropdown">
                     <button type="button" class="model-dropdown-trigger${this._modelDropdownOpen ? " open" : ""}">
-                        <span>${selectedModel.name}</span>
+                        <span>${escapeHtml(selectedModel.name)}</span>
                         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
                     </button>
                     <div class="model-dropdown-list${this._modelDropdownOpen ? " open" : ""}">
-                        ${models.map((m) => `<div class="model-dropdown-item${this.settings.model === m.id ? " selected" : ""}" data-value="${m.id}">${m.name}${m.free && !isOpenRouter ? " (Free)" : ""}</div>`).join("")}
+                        ${models.map((m) => `<div class="model-dropdown-item${this.settings.model === m.id ? " selected" : ""}" data-value="${escapeHtml(m.id)}">${escapeHtml(m.name)}${m.free && !isOpenRouter ? " (Free)" : ""}</div>`).join("")}
                     </div>
                 </div>`;
             } else {
@@ -953,7 +968,7 @@ class AISettingsModal extends HTMLElement {
             html += `
                 <div class="form-group">
                     <label for="ai-api-key">API Key</label>
-                    <input type="password" id="ai-api-key" placeholder="${placeholder}" value="${this.settings.apiKey}" autocomplete="off">
+                    <input type="password" id="ai-api-key" placeholder="${placeholder}" value="${escapeHtml(this.settings.apiKey)}" autocomplete="off">
                 </div>
             `;
         }
@@ -963,7 +978,7 @@ class AISettingsModal extends HTMLElement {
             html += `
                 <div class="form-group">
                     <label for="ai-ollama-url">Server URL</label>
-                    <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434" value="${this.settings.ollamaUrl || "http://localhost:11434"}">
+                    <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434" value="${escapeHtml(this.settings.ollamaUrl || "http://localhost:11434")}">
                     <span class="helper-text">Make sure Ollama is running locally</span>
                 </div>
             `;
@@ -988,7 +1003,7 @@ class AISettingsModal extends HTMLElement {
             html += `
                 <div class="form-group">
                     <label for="ai-custom-model">Or enter custom model name</label>
-                    <input type="text" id="ai-custom-model" placeholder="e.g., qwen3-vl:latest, deepseek-r1:latest" value="${this.settings.model && !this.dynamicModels.find((m) => m.id === this.settings.model) ? this.settings.model : ""}">
+                    <input type="text" id="ai-custom-model" placeholder="e.g., qwen3-vl:latest, deepseek-r1:latest" value="${escapeHtml(this.settings.model && !this.dynamicModels.find((m) => m.id === this.settings.model) ? this.settings.model : "")}">
                     <span class="helper-text">Embedding models are automatically excluded. Use <code style="color:var(--color-accent-fg)">ollama list</code> to see installed models.</span>
                 </div>
             `;
@@ -1002,7 +1017,7 @@ class AISettingsModal extends HTMLElement {
         if (this.testStatus.success) {
             return `<div class="test-result success">Connection successful!</div>`;
         }
-        return `<div class="test-result error">Error: ${this.testStatus.error || "Connection failed"}</div>`;
+        return `<div class="test-result error">Error: ${escapeHtml(this.testStatus.error || "Connection failed")}</div>`;
     }
 }
 
@@ -1249,7 +1264,7 @@ function showPromptSettingsModal(currentSettings, onSave) {
                             background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 12px;
                             color:#c9d1d9;font-family:inherit;font-size:13px;outline:none;resize:vertical;
                             width:100%;box-sizing:border-box;
-                        ">${customPrompt}</textarea>
+                        ">${escapeHtml(customPrompt)}</textarea>
                         <span style="font-size:10px;color:#8b949e;">Project info (name, language, README) is appended automatically.</span>
                     </div>
                 `
@@ -1690,7 +1705,7 @@ async function _getGitHubToken() {
             }
         };
         window.addEventListener("message", handler);
-        window.postMessage({ type: "GET_GITHUB_DATA" }, "*");
+        window.postMessage({ type: "GET_GITHUB_DATA" }, window.location.origin);
         setTimeout(() => {
             window.removeEventListener("message", handler);
             resolve("");
@@ -1966,30 +1981,38 @@ function showAIDeclarationWarning(result) {
         gap: 12px;
         padding: 12px 16px;
         margin-bottom: 16px;
-        background: #0d1117; /* dark panel */
-        border: 1px solid rgba(99,104,112,0.10);
-        border-left: 4px solid rgba(227,179,65,0.18); /* subtle accent */
-        border-radius: 10px;
-        box-shadow: 0 12px 30px rgba(2,6,23,0.6);
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-left: 4px solid #e3b341;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(1,4,9,0.6);
         font-size: 13px;
-        font-family: inherit;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
         color: #c9d1d9;
     `;
 
     const warningBtn = _makeDeclarationBtn(true);
     _triggerDeclarationGeneration(warningBtn, declarationField);
-    // style override so the button matches the dark warning panel
-    warningBtn.style.background = "rgba(227,179,65,0.06)";
-    warningBtn.style.borderColor = "rgba(227,179,65,0.18)";
+    // style override so the button matches the extension theme (amber for AI warning)
+    warningBtn.style.background = "rgba(227,179,65,0.08)";
+    warningBtn.style.borderColor = "rgba(227,179,65,0.35)";
     warningBtn.style.color = "#e3b341";
     warningBtn.style.fontWeight = "600";
     warningBtn.style.marginTop = "8px";
+    warningBtn.addEventListener("mouseenter", () => {
+        warningBtn.style.background = "rgba(227,179,65,0.18)";
+        warningBtn.style.borderColor = "rgba(227,179,65,0.6)";
+    });
+    warningBtn.addEventListener("mouseleave", () => {
+        warningBtn.style.background = "rgba(227,179,65,0.08)";
+        warningBtn.style.borderColor = "rgba(227,179,65,0.35)";
+    });
 
     const textDiv = document.createElement("div");
     textDiv.style.cssText = "flex:1;min-width:0;";
     textDiv.innerHTML = `
         <div style="display:flex;gap:12px;align-items:center;min-width:0;">
-            <div style="width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div style="width:36px;height:36px;border-radius:6px;background:#21262d;border:1px solid #30363d;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="#e3b341" style="display:block;">
                     <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
                 </svg>
@@ -2274,13 +2297,19 @@ class GitHubImportModal extends HTMLElement {
                 }
             };
             window.addEventListener("message", handler);
-            window.postMessage({ type: "GET_GITHUB_DATA" }, "*");
+            window.postMessage(
+                { type: "GET_GITHUB_DATA" },
+                window.location.origin,
+            );
             setTimeout(resolve, 1000);
         });
     }
 
     saveData(username, token) {
-        window.postMessage({ type: "SAVE_GITHUB_DATA", username, token }, "*");
+        window.postMessage(
+            { type: "SAVE_GITHUB_DATA", username, token },
+            window.location.origin,
+        );
     }
 
     async fetchRepositories() {
@@ -2836,7 +2865,7 @@ class GitHubImportModal extends HTMLElement {
                     clientId: GITHUB_OAUTH_CLIENT_ID,
                     scopes: "public_repo read:user",
                 },
-                "*",
+                window.location.origin,
             );
 
             setTimeout(() => {
@@ -2912,7 +2941,7 @@ class GitHubImportModal extends HTMLElement {
                     requestId,
                     clientId: GITHUB_OAUTH_CLIENT_ID,
                 },
-                "*",
+                window.location.origin,
             );
 
             // Timeout for this poll request
@@ -2933,7 +2962,7 @@ class GitHubImportModal extends HTMLElement {
         if (this.state.oauthFlow) {
             window.postMessage(
                 { type: "OAUTH_CANCEL", requestId: Date.now().toString() },
-                "*",
+                window.location.origin,
             );
             this.state.oauthFlow = null;
         }
@@ -3728,7 +3757,7 @@ function _issueMessageBridge(issue) {
         window.addEventListener("message", handler);
         window.postMessage(
             { type: "CREATE_GITHUB_ISSUE", requestId, issue },
-            "*",
+            window.location.origin,
         );
     });
 }
@@ -3831,13 +3860,16 @@ function showReportIssueModal() {
                     ${S.repoLabels
                         .map((l) => {
                             const sel = S.selectedLabels.includes(l.name);
-                            return `<button data-label="${l.name}" class="issue-label-chip" title="${l.description}" style="
+                            const safeColor = /^[0-9a-fA-F]{6}$/.test(l.color)
+                                ? l.color
+                                : "8b949e";
+                            return `<button data-label="${escapeHtml(l.name)}" class="issue-label-chip" title="${escapeHtml(l.description || "")}" style="
                             padding:3px 10px;border-radius:12px;font-size:11px;font-family:inherit;cursor:pointer;
-                            border:1px solid #${l.color};transition:all 0.15s;
-                            background:${sel ? "#" + l.color + "30" : "transparent"};
-                            color:${sel ? "#fff" : "#" + l.color};
+                            border:1px solid #${safeColor};transition:all 0.15s;
+                            background:${sel ? "#" + safeColor + "30" : "transparent"};
+                            color:${sel ? "#fff" : "#" + safeColor};
                             font-weight:${sel ? "600" : "400"};
-                        ">${l.name}</button>`;
+                        ">${escapeHtml(l.name)}</button>`;
                         })
                         .join("")}
                 </div>
@@ -3909,14 +3941,14 @@ function showReportIssueModal() {
                         <select id="issue-browser" style="${_issueSelectStyle}">
                             ${ISSUE_BROWSERS.map((b) => `<option value="${b}" ${b === S.browser ? "selected" : ""}>${b}</option>`).join("")}
                         </select>
-                        ${S.browser === "Other" ? `<input id="issue-browser-custom" type="text" placeholder="Your browser name" value="${S.browserCustom}" style="${_iStyle}">` : ""}
+                        ${S.browser === "Other" ? `<input id="issue-browser-custom" type="text" placeholder="Your browser name" value="${escapeHtml(S.browserCustom)}" style="${_iStyle}">` : ""}
                     </div>
                     <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
                         <label style="font-size:11px;font-weight:600;color:#8b949e;">OS</label>
                         <select id="issue-os" style="${_issueSelectStyle}">
                             ${ISSUE_OS_LIST.map((o) => `<option value="${o}" ${o === S.os ? "selected" : ""}>${o}</option>`).join("")}
                         </select>
-                        ${S.os === "Other" ? `<input id="issue-os-custom" type="text" placeholder="Your OS name" value="${S.osCustom}" style="${_iStyle}">` : ""}
+                        ${S.os === "Other" ? `<input id="issue-os-custom" type="text" placeholder="Your OS name" value="${escapeHtml(S.osCustom)}" style="${_iStyle}">` : ""}
                     </div>
                     <div style="display:flex;align-items:center;padding:6px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;font-size:11px;color:#8b949e;white-space:nowrap;">v${version}</div>
                 </div>

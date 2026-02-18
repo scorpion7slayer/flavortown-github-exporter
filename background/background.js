@@ -3,8 +3,21 @@
  * Handles AI API calls, dynamic model fetching, and OAuth Device Flow
  */
 
-// OAuth Device Flow state
-let deviceFlowState = null;
+// OAuth Device Flow state — stored in chrome.storage.session so it survives
+// MV3 service worker suspensions (Chrome can kill the SW after ~30s of inactivity).
+// chrome.storage.session is cleared on browser close, never written to disk.
+async function getDeviceFlowState() {
+    const { deviceFlowState = null } =
+        await chrome.storage.session.get("deviceFlowState");
+    return deviceFlowState;
+}
+
+async function setDeviceFlowState(state) {
+    if (state === null) {
+        return chrome.storage.session.remove("deviceFlowState");
+    }
+    return chrome.storage.session.set({ deviceFlowState: state });
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "AI_GENERATE_DESCRIPTION") {
@@ -62,7 +75,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === "OAUTH_CANCEL") {
-        deviceFlowState = null;
+        setDeviceFlowState(null); // fire-and-forget, no need to await
         sendResponse({ cancelled: true });
         return true;
     }
@@ -91,14 +104,14 @@ async function startDeviceFlow(clientId, scopes = "public_repo read:user") {
     }
 
     const data = await resp.json();
-    deviceFlowState = {
+    await setDeviceFlowState({
         deviceCode: data.device_code,
         userCode: data.user_code,
         verificationUri: data.verification_uri,
         expiresIn: data.expires_in,
         interval: data.interval || 5,
         expiresAt: Date.now() + data.expires_in * 1000,
-    };
+    });
 
     return {
         userCode: data.user_code,
@@ -108,12 +121,14 @@ async function startDeviceFlow(clientId, scopes = "public_repo read:user") {
 }
 
 async function pollForToken(clientId) {
-    if (!deviceFlowState) {
+    const state = await getDeviceFlowState();
+
+    if (!state) {
         throw new Error("No active device flow. Please start again.");
     }
 
-    if (Date.now() > deviceFlowState.expiresAt) {
-        deviceFlowState = null;
+    if (Date.now() > state.expiresAt) {
+        await setDeviceFlowState(null);
         throw new Error("Device code expired. Please start again.");
     }
 
@@ -125,7 +140,7 @@ async function pollForToken(clientId) {
         },
         body: JSON.stringify({
             client_id: clientId,
-            device_code: deviceFlowState.deviceCode,
+            device_code: state.deviceCode,
             grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         }),
     });
@@ -134,25 +149,26 @@ async function pollForToken(clientId) {
 
     if (data.error) {
         if (data.error === "authorization_pending") {
-            return { pending: true, interval: deviceFlowState.interval };
+            return { pending: true, interval: state.interval };
         }
         if (data.error === "slow_down") {
-            deviceFlowState.interval = (deviceFlowState.interval || 5) + 5;
-            return { pending: true, interval: deviceFlowState.interval };
+            const newInterval = (state.interval || 5) + 5;
+            await setDeviceFlowState({ ...state, interval: newInterval });
+            return { pending: true, interval: newInterval };
         }
         if (data.error === "expired_token") {
-            deviceFlowState = null;
+            await setDeviceFlowState(null);
             throw new Error("Device code expired. Please start again.");
         }
         if (data.error === "access_denied") {
-            deviceFlowState = null;
+            await setDeviceFlowState(null);
             throw new Error("Authorization was denied by the user.");
         }
         throw new Error(data.error_description || data.error);
     }
 
     // Success! We got the token
-    deviceFlowState = null;
+    await setDeviceFlowState(null);
     return {
         accessToken: data.access_token,
         tokenType: data.token_type,
@@ -324,13 +340,14 @@ async function callProvider(settings, prompt, githubToken) {
             return data.choices[0].message.content.trim();
         }
 
-        case "claude": {
+        case "anthropic": {
             const resp = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "x-api-key": apiKey,
                     "anthropic-version": "2023-06-01",
+                    "anthropic-dangerous-direct-browser-access": "true",
                 },
                 body: JSON.stringify({
                     model: model || "claude-sonnet-4-5-20250929",

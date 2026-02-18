@@ -268,10 +268,11 @@ async function callProvider(settings, prompt, githubToken) {
             );
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
-                throw new Error(
-                    err.error?.message ||
-                        `GitHub Copilot: ${resp.status}. Check your Copilot subscription.`,
-                );
+                const fallback =
+                    resp.status === 429
+                        ? "GitHub Copilot: rate limit reached. Please wait a moment and try again."
+                        : `GitHub Copilot: ${resp.status}. Check your Copilot subscription.`;
+                throw new Error(err.error?.message || fallback);
             }
             const data = await resp.json();
             return data.choices[0].message.content.trim();

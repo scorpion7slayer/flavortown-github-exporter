@@ -127,6 +127,7 @@ const CHANGELOG = [
             "Add button Generate with AI for AI Declaration",
             "improvement of the style for certain places which makes the interface prettier and pleasant",
             "free and inexpensive ai models kept only",
+            'AI use detector in the project to advise writing in "AI Declaration" or generating with AI',
         ],
     },
     {
@@ -1648,6 +1649,15 @@ const AI_COMMIT_PATTERNS = [
     { re: /🤖 generated with \[claude/i, tool: "Claude" },
 ];
 
+// Login substring -> tool mapping for detecting AI bot accounts in contributors/commit authors
+const AI_LOGIN_MAP = [
+    { substr: "copilot", tool: "GitHub Copilot" },
+    { substr: "claude", tool: "Claude" },
+    { substr: "cursor", tool: "Cursor" },
+    { substr: "devin", tool: "Devin AI" },
+    { substr: "coderabbit", tool: "CodeRabbitAI" },
+];
+
 // AI config files — presence alone is a strong signal of heavy AI usage
 const AI_CONFIG_FILES = [
     { path: "CLAUDE.md", tool: "Claude" },
@@ -1708,6 +1718,7 @@ async function checkAIContributions(repo) {
     const detectedTools = new Set();
     let aiCommits = 0;
     let totalCommits = 0;
+    let contributorMatches = 0; // number of contributors that look like AI/bots
 
     try {
         // 1. Check contributors list for known AI bots
@@ -1720,36 +1731,74 @@ async function checkAIContributions(repo) {
             if (Array.isArray(contributors)) {
                 for (const c of contributors) {
                     const login = (c.login || "").toLowerCase();
-                    if (AI_BOT_LOGINS.some((b) => login === b.toLowerCase())) {
-                        if (login.includes("copilot"))
-                            detectedTools.add("GitHub Copilot");
-                        if (login.includes("devin"))
-                            detectedTools.add("Devin AI");
-                        if (login.includes("cursor"))
-                            detectedTools.add("Cursor");
-                        if (login.includes("claude"))
-                            detectedTools.add("Claude");
+
+                    // exact-match bot logins OR substring hints
+                    const isKnownBotLogin = AI_BOT_LOGINS.some(
+                        (b) => login === b.toLowerCase(),
+                    );
+                    const mappedTools = AI_LOGIN_MAP.filter((m) =>
+                        login.includes(m.substr),
+                    ).map((m) => m.tool);
+                    if (isKnownBotLogin || mappedTools.length > 0) {
+                        contributorMatches++;
+                        for (const t of mappedTools) detectedTools.add(t);
+                        // if exact match not mapped already, attempt to derive tool from login
+                        if (isKnownBotLogin && mappedTools.length === 0) {
+                            if (login.includes("copilot"))
+                                detectedTools.add("GitHub Copilot");
+                            else if (login.includes("devin"))
+                                detectedTools.add("Devin AI");
+                            else if (login.includes("cursor"))
+                                detectedTools.add("Cursor");
+                            else if (login.includes("claude"))
+                                detectedTools.add("Claude");
+                        }
                     }
                 }
             }
         }
 
-        // 2. Check recent commits for AI co-authorship patterns
-        const commitsResp = await fetch(
-            `https://api.github.com/repos/${fullName}/commits?per_page=100`,
-            { headers },
-        );
-        if (commitsResp.ok) {
-            const commits = await commitsResp.json();
-            if (Array.isArray(commits) && commits.length > 0) {
-                totalCommits = commits.length;
+        // 2. Check recent commits for AI co-authorship patterns (paginated)
+        // Fetch up to `maxPages * perPage` commits to improve detection accuracy
+        const perPage = 100;
+        const maxPages = 5; // scan up to 500 commits
+        let page = 1;
+        while (page <= maxPages) {
+            try {
+                const commitsResp = await fetch(
+                    `https://api.github.com/repos/${fullName}/commits?per_page=${perPage}&page=${page}`,
+                    { headers },
+                );
+
+                if (!commitsResp.ok) {
+                    // stop paging on error (rate limit, 4xx/5xx)
+                    console.debug(
+                        `FT: commits fetch failed for ${fullName} (page ${page})`,
+                        commitsResp.status,
+                    );
+                    break;
+                }
+
+                const commits = await commitsResp.json();
+                if (!Array.isArray(commits) || commits.length === 0) break;
+
+                // accumulate total commits scanned
+                totalCommits += commits.length;
+
                 for (const commit of commits) {
                     const message = commit.commit?.message || "";
                     const authorLogin = (
                         commit.author?.login || ""
                     ).toLowerCase();
+                    const commitAuthorName = (
+                        commit.commit?.author?.name || ""
+                    ).toLowerCase();
+                    const commitAuthorEmail = (
+                        commit.commit?.author?.email || ""
+                    ).toLowerCase();
                     let isAI = false;
 
+                    // author login may indicate a bot (linked GitHub account)
                     if (
                         AI_BOT_LOGINS.some(
                             (b) => authorLogin === b.toLowerCase(),
@@ -1762,8 +1811,22 @@ async function checkAIContributions(repo) {
                             detectedTools.add("Devin AI");
                         if (authorLogin.includes("cursor"))
                             detectedTools.add("Cursor");
+                        if (authorLogin.includes("claude"))
+                            detectedTools.add("Claude");
                     }
 
+                    // commit author name/email may indicate an AI agent even when commit.author is null
+                    for (const m of AI_LOGIN_MAP) {
+                        if (
+                            commitAuthorName.includes(m.substr) ||
+                            commitAuthorEmail.includes(m.substr)
+                        ) {
+                            isAI = true;
+                            detectedTools.add(m.tool);
+                        }
+                    }
+
+                    // commit message patterns
                     for (const { re, tool } of AI_COMMIT_PATTERNS) {
                         if (re.test(message)) {
                             isAI = true;
@@ -1773,15 +1836,72 @@ async function checkAIContributions(repo) {
 
                     if (isAI) aiCommits++;
                 }
+
+                // if fewer than perPage returned, we've reached the last page
+                if (commits.length < perPage) break;
+                page += 1;
+            } catch (err) {
+                console.warn("FT: error paging commits for", fullName, err);
+                break;
+            }
+        }
+    } catch (err) {
+        console.warn("FT: checkAIContributions failed for", fullName, err);
+        return null;
+    }
+
+    // --- Additional signals: README patterns and config files ---
+    try {
+        // 1) README content (API returns base64 content)
+        const readmeResp = await fetch(
+            `https://api.github.com/repos/${fullName}/readme`,
+            { headers },
+        );
+        if (readmeResp.ok) {
+            const readmeJson = await readmeResp.json();
+            const encoded = readmeJson.content || "";
+            try {
+                const decoded = atob(encoded.replace(/\s+/g, ""));
+                for (const { re, tool } of README_AI_PATTERNS) {
+                    if (re.test(decoded)) detectedTools.add(tool);
+                }
+            } catch (_) {
+                // ignore decode errors
+            }
+        }
+    } catch (_) {
+        // ignore README fetch errors
+    }
+
+    try {
+        // 2) Specific AI config files (root/.github/etc.) — stop early if we already found tools
+        if (detectedTools.size === 0) {
+            for (const { path, tool } of AI_CONFIG_FILES) {
+                try {
+                    const p = encodeURIComponent(path.replace(/^\//, ""));
+                    const resp = await fetch(
+                        `https://api.github.com/repos/${fullName}/contents/${p}`,
+                        { headers },
+                    );
+                    if (resp.ok) {
+                        detectedTools.add(tool);
+                        // don't break — collect all detected tools
+                    }
+                } catch (_) {
+                    // ignore per-file errors
+                }
             }
         }
     } catch (_) {}
 
-    if (totalCommits === 0) return null;
+    // If no commits AND no other signals, nothing to report
+    if (totalCommits === 0 && detectedTools.size === 0) return null;
+
     return {
-        percentage: aiCommits / totalCommits,
+        percentage: totalCommits > 0 ? aiCommits / totalCommits : 0,
         aiCommits,
         totalCommits,
+        contributorMatches,
         detectedTools: [...detectedTools],
     };
 }
@@ -1803,11 +1923,38 @@ function showAIDeclarationWarning(result) {
 
     const inputContainer =
         declarationField.closest(".input") || declarationField.parentNode;
-    const pct = Math.round(result.percentage * 100);
+
+    // If no explicit commit matches but contributors or other signals matched, show an estimated count
+    const displayAiCommits =
+        result.aiCommits > 0
+            ? result.aiCommits
+            : result.contributorMatches > 0
+              ? result.contributorMatches
+              : 1; // at least 1 when we detected a tool via README/config
+
+    const rawPct =
+        result.totalCommits > 0
+            ? (displayAiCommits / result.totalCommits) * 100
+            : 0;
+    // If total commits unknown, show N/A for percentage
+    const displayPctText =
+        result.totalCommits > 0
+            ? rawPct >= 1
+                ? `${Math.round(rawPct)}`
+                : "<1"
+            : "N/A";
+
     const tools =
         result.detectedTools.length > 0
             ? result.detectedTools.join(", ")
             : "AI tools";
+
+    const detectionSource =
+        result.aiCommits > 0
+            ? "commit history"
+            : result.contributorMatches > 0
+              ? "contributors"
+              : "README/config";
 
     const banner = document.createElement("div");
     banner.id = "ai-declaration-warning";
@@ -1850,10 +1997,16 @@ function showAIDeclarationWarning(result) {
             <div style="flex:1;min-width:0;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <strong style="font-size:13px;color:#e3b341;white-space:nowrap;">AI usage detected</strong>
-                    <span style="background:rgba(227,179,65,0.12);color:#e3b341;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid rgba(227,179,65,0.16);">${pct}%</span>
+                    <span style="background:rgba(227,179,65,0.12);color:#e3b341;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid rgba(227,179,65,0.16);">${displayPctText}${result.totalCommits > 0 ? "%" : ""}</span>
                 </div>
                 <div style="margin-top:6px;color:#8b949e;line-height:1.4;overflow:hidden;text-overflow:ellipsis;">
-                    ${tools} detected in commit history (${result.aiCommits}/${result.totalCommits} commits).
+                    ${
+                        result.aiCommits > 0
+                            ? `${tools} detected in commit history (${result.aiCommits}${result.totalCommits > 0 ? `/${result.totalCommits}` : ""} commits).`
+                            : result.contributorMatches > 0
+                              ? `${tools} detected among contributors (${result.contributorMatches} match${result.contributorMatches > 1 ? "es" : ""}). Estimated: ${displayAiCommits}${result.totalCommits > 0 ? `/${result.totalCommits}` : ""} commits.`
+                              : `${tools} detected in ${detectionSource}. Estimated: ${displayAiCommits}${result.totalCommits > 0 ? `/${result.totalCommits}` : ""} commits.`
+                    }
                     Projects that use AI may be <strong style="color:#e3b341;">rejected</strong> without an AI declaration.
                 </div>
             </div>
@@ -1975,12 +2128,17 @@ function findReadmeInput() {
 // Returns "owner/repo" or null.
 function parseRepoFullName(input) {
     if (!input || typeof input !== "string") return null;
-    const v = input.trim().replace(/\.git$/i, "").replace(/\/$/, "");
+    const v = input
+        .trim()
+        .replace(/\.git$/i, "")
+        .replace(/\/$/, "");
     // Full name like owner/repo
     const simpleMatch = v.match(/^([\w.-]+)\/([\w.-]+)$/);
     if (simpleMatch) return `${simpleMatch[1]}/${simpleMatch[2]}`;
     // HTTPS URL
-    const httpsMatch = v.match(/^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\/.*)?$/i);
+    const httpsMatch = v.match(
+        /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\/.*)?$/i,
+    );
     if (httpsMatch) return `${httpsMatch[1]}/${httpsMatch[2]}`;
     // SSH URL
     const sshMatch = v.match(/^git@github\.com:([^\/]+)\/([^\/]+)(?:\.git)?$/i);
@@ -1992,26 +2150,86 @@ function parseRepoFullName(input) {
 // and run AI-detection for that repo so the banner appears for manual imports.
 function attachRepoInputWatcher() {
     try {
-        const repoInput = findRepoInput();
-        if (!repoInput || repoInput._ftRepoWatcher) return;
-        repoInput._ftRepoWatcher = true;
-
-        const runDetection = async () => {
-            const val = (repoInput.value || "").trim();
-            const full = parseRepoFullName(val);
-            if (!full) return;
-            // set lastImportedRepo so other UI (generate button) works
-            if (!lastImportedRepo || lastImportedRepo.full_name !== full) {
-                lastImportedRepo = { full_name: full, html_url: `https://github.com/${full}` };
-            }
-            const result = await checkAIContributions(full);
-            showAIDeclarationWarning(result);
+        // Debounced detection helper
+        let detectTimer = null;
+        const scheduleDetection = (fn, delay = 500) => {
+            if (detectTimer) clearTimeout(detectTimer);
+            detectTimer = setTimeout(fn, delay);
         };
 
-        repoInput.addEventListener("change", runDetection);
-        repoInput.addEventListener("blur", runDetection);
-        repoInput.addEventListener("paste", () => setTimeout(runDetection, 100));
-    } catch (_) {}
+        const bindTo = (repoInput) => {
+            if (!repoInput || repoInput._ftRepoWatcher) return;
+            repoInput._ftRepoWatcher = true;
+
+            const runDetection = async () => {
+                try {
+                    const val = (repoInput.value || "").trim();
+                    const full = parseRepoFullName(val);
+                    if (!full) return;
+                    console.debug("FT: running AI detection for", full);
+
+                    // set lastImportedRepo so other UI (generate button) works
+                    if (
+                        !lastImportedRepo ||
+                        lastImportedRepo.full_name !== full
+                    ) {
+                        lastImportedRepo = {
+                            full_name: full,
+                            html_url: `https://github.com/${full}`,
+                        };
+                    }
+
+                    const result = await checkAIContributions(full);
+                    if (!result) {
+                        console.debug(
+                            "FT: checkAIContributions returned null for",
+                            full,
+                        );
+                        return;
+                    }
+                    showAIDeclarationWarning(result);
+                } catch (err) {
+                    console.warn("FT: runDetection error", err);
+                }
+            };
+
+            repoInput.addEventListener("input", () =>
+                scheduleDetection(runDetection, 600),
+            );
+            repoInput.addEventListener("change", () =>
+                scheduleDetection(runDetection, 200),
+            );
+            repoInput.addEventListener("blur", () =>
+                scheduleDetection(runDetection, 100),
+            );
+            repoInput.addEventListener("paste", () =>
+                scheduleDetection(runDetection, 200),
+            );
+        };
+
+        const repoInput = findRepoInput();
+        if (repoInput) {
+            bindTo(repoInput);
+            return;
+        }
+
+        // If input not yet present, observe the DOM and bind when it appears
+        if (document.body._ftRepoObserver) return;
+        const observer = new MutationObserver(() => {
+            const el = findRepoInput();
+            if (el) {
+                bindTo(el);
+                if (document.body._ftRepoObserver) {
+                    document.body._ftRepoObserver.disconnect();
+                    document.body._ftRepoObserver = null;
+                }
+            }
+        });
+        document.body._ftRepoObserver = observer;
+        observer.observe(document.body, { childList: true, subtree: true });
+    } catch (err) {
+        console.warn("FT: attachRepoInputWatcher error", err);
+    }
 }
 
 // ─── GitHub Import Modal (original + AI integration) ────────────────────────

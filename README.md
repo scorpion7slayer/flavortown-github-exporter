@@ -1,14 +1,8 @@
 # 🚀 Flavortown GitHub Exporter
 
-<div align="center">
+## Import your GitHub projects to Flavortown with one click
 
-**Import your GitHub projects to Flavortown with one click**
-
-[![Chrome Web Store](https://img.shields.io/badge/Chrome-Available-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/ohkkaaibkhikfeemhpfpdhbpopjngaia?utm_source=item-share-cb)
-[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Available-brightgreen?style=for-the-badge&logo=firefox&logoColor=white)](https://addons.mozilla.org/fr/firefox/addon/flavortown-github-exporter/)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
-
-</div>
+[![Chrome — Available](https://img.shields.io/badge/Chrome-Available-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/ohkkaaibkhikfeemhpfpdhbpopjngaia?utm_source=item-share-cb) [![Firefox — Available](https://img.shields.io/badge/Firefox-Available-brightgreen?style=for-the-badge&logo=firefox&logoColor=white)](https://addons.mozilla.org/fr/firefox/addon/flavortown-github-exporter/) [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 ---
 
@@ -16,15 +10,15 @@
 
 **Flavortown GitHub Exporter** is a browser extension that streamlines the process of sharing your GitHub projects on [Flavortown](https://flavortown.hackclub.com/). Instead of manually copying and pasting information from your repositories, this extension does all the heavy lifting for you.
 
-### What it does:
+### What it does
 
 - 🔗 **One-Click Import** - Adds an "Import from GitHub" button directly to the Flavortown new project page
 - 📦 **Browse Your Repos** - Displays all your public GitHub repositories in an elegant modal interface
 - 🎯 **Auto-Fill Forms** - Automatically fills in project details including:
-    - Project name
-    - Repository URL
-    - Demo/homepage link
-    - README link
+  - Project name
+  - Repository URL
+  - Demo/homepage link
+  - README link
 - 🔒 **Secure** - Your GitHub token is stored locally in your browser and never sent to third parties
 - 🎨 **Beautiful UI** - Clean, GitHub-inspired interface with dark mode support
 - ⚡ **Fast & Lightweight** - Minimal performance impact, only active on Flavortown pages
@@ -172,8 +166,4 @@ Built with ❤️ for the [Hack Club](https://hackclub.com/) community
 
 ---
 
-<div align="center">
-
 **Enjoying the extension? Give us a ⭐ on GitHub!**
-
-</div>

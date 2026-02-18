@@ -85,7 +85,9 @@ async function startDeviceFlow(clientId, scopes = "public_repo read:user") {
 
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error_description || `GitHub error: ${resp.status}`);
+        throw new Error(
+            err.error_description || `GitHub error: ${resp.status}`,
+        );
     }
 
     const data = await resp.json();
@@ -160,7 +162,12 @@ async function pollForToken(clientId) {
 
 // ─── AI Declaration Generation ──────────────────────────────────────────────
 
-async function handleAIDeclarationGeneration({ projectTitle, projectDescription, settings, githubToken }) {
+async function handleAIDeclarationGeneration({
+    projectTitle,
+    projectDescription,
+    settings,
+    githubToken,
+}) {
     const prompt = buildDeclarationPrompt(projectTitle, projectDescription);
     const declaration = await callProvider(settings, prompt, githubToken);
     return { declaration, error: null };
@@ -170,7 +177,9 @@ function buildDeclarationPrompt(title, description) {
     const context = [
         title ? `Project: ${title}` : "",
         description ? `Description: ${description}` : "",
-    ].filter(Boolean).join("\n");
+    ]
+        .filter(Boolean)
+        .join("\n");
 
     return `Help a developer write an honest AI declaration for their project submission on Flavortown (a Hack Club program).
 
@@ -396,11 +405,11 @@ async function getCopilotSubscription(githubToken) {
                 Accept: "application/vnd.github+json",
             },
         });
-        
+
         if (resp.ok) {
             return { hasCopilot: true, plan: "unknown" };
         }
-        
+
         return { hasCopilot: false, plan: "none" };
     } catch (e) {
         console.error("Failed to get Copilot subscription:", e);
@@ -411,11 +420,11 @@ async function getCopilotSubscription(githubToken) {
 async function fetchCopilotModels(githubToken) {
     // Check if user has Copilot
     const { hasCopilot } = await getCopilotSubscription(githubToken);
-    
+
     if (!hasCopilot) {
-        return COPILOT_MODELS.map(m => ({ ...m, free: false }));
+        return COPILOT_MODELS.map((m) => ({ ...m, free: false }));
     }
-    
+
     // Try to fetch available models from GitHub Models API
     try {
         const resp = await fetch(`${COPILOT_API_BASE}/catalog/models`, {
@@ -424,21 +433,21 @@ async function fetchCopilotModels(githubToken) {
                 Accept: "application/vnd.github+json",
             },
         });
-        
+
         if (resp.ok) {
             const data = await resp.json();
             const availableModels = data.data || [];
-            const availableIds = new Set(availableModels.map(m => m.id));
-            
-            return COPILOT_MODELS.map(m => ({
+            const availableIds = new Set(availableModels.map((m) => m.id));
+
+            return COPILOT_MODELS.map((m) => ({
                 ...m,
-                available: availableIds.has(m.id)
+                available: availableIds.has(m.id),
             }));
         }
     } catch (e) {
         console.error("Failed to fetch Copilot models:", e);
     }
-    
+
     // Fallback to static list
     return COPILOT_MODELS;
 }
@@ -450,27 +459,27 @@ async function fetchModels(settings, githubToken) {
         case "copilot": {
             if (!githubToken) {
                 // No token - all models shown as not free
-                return { 
-                    models: COPILOT_MODELS.map(m => ({ ...m, free: false })), 
-                    error: null 
+                return {
+                    models: COPILOT_MODELS.map((m) => ({ ...m, free: false })),
+                    error: null,
                 };
             }
 
             try {
                 const models = await fetchCopilotModels(githubToken);
-                
+
                 // Sort: free first, then by name
                 models.sort((a, b) => {
                     if (a.free && !b.free) return -1;
                     if (!a.free && b.free) return 1;
                     return a.name.localeCompare(b.name);
                 });
-                
+
                 return { models, error: null };
             } catch (e) {
-                return { 
-                    models: COPILOT_MODELS.map(m => ({ ...m, free: false })), 
-                    error: `Could not fetch Copilot models: ${e.message}` 
+                return {
+                    models: COPILOT_MODELS.map((m) => ({ ...m, free: false })),
+                    error: `Could not fetch Copilot models: ${e.message}`,
                 };
             }
         }
@@ -541,7 +550,11 @@ async function fetchModels(settings, githubToken) {
             const data = await resp.json();
             const models = data.data
                 .filter((m) => m.id && m.name)
-                .filter((m) => m.pricing?.prompt === "0" && m.pricing?.completion === "0")
+                .filter(
+                    (m) =>
+                        m.pricing?.prompt === "0" &&
+                        m.pricing?.completion === "0",
+                )
                 .map((m) => ({
                     id: m.id,
                     name: m.name || m.id,

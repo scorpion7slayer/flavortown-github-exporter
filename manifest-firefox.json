@@ -49,7 +49,7 @@
     "manifest_version": 3,
     "name": "Flavortown GitHub Exporter",
     "permissions": ["storage", "declarativeNetRequest"],
-    "version": "2.0.0",
+    "version": "2.5.0",
     "web_accessible_resources": [
         {
             "matches": ["https://flavortown.hackclub.com/*"],

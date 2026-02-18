@@ -69,14 +69,13 @@ Go to [https://flavortown.hackclub.com/projects/new](https://flavortown.hackclub
 
 You'll see a new **"Import"** button next to the "Create a new Project" heading.
 
-### 3. **Set Up Your GitHub Token**
+### 3. **Sign in with GitHub**
 
-On first use, you'll need to provide a GitHub Personal Access Token:
+On first use, you'll be asked to authenticate:
 
-- Click the **"Create a token"** link in the modal
-- GitHub will open with the correct settings pre-configured
-- Scroll down and click **"Generate token"** (no need to change any settings)
-- Copy the token and paste it into the extension
+- Click **"Sign in with GitHub"** in the modal
+- Authorize the extension via OAuth
+- You're ready to go — no token to copy or paste!
 
 ### 4. **Browse Your Repositories**
 

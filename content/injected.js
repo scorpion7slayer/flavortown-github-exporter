@@ -366,7 +366,7 @@ class AISettingsModal extends HTMLElement {
         html += `</div></div>`;
 
         if (this.modelsError) {
-            html += `<span class="helper-text" style="color:var(--color-danger-fg);margin-top:6px;display:block;">${this.modelsError}</span>`;
+            html += `<span class="helper-text" style="color:var(--color-danger-fg);margin-top:6px;display:block;">${escapeHtml(this.modelsError)}</span>`;
         }
 
         return html;

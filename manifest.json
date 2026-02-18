@@ -4,7 +4,8 @@
     "version": "2.5.0",
     "description": "Import your GitHub projects to Flavortown with one click and auto-generate descriptions with AI",
     "background": {
-        "service_worker": "background/background.js"
+        "service_worker": "background/background.js",
+        "scripts": ["background/background.js"]
     },
     "browser_specific_settings": {
         "gecko": {
